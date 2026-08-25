@@ -1,17 +1,51 @@
 const crypto = require('crypto');
+const { pool } = require('../db/init');
 
-function requireLogin(req, res, next) {
+async function findSessionUser(req) {
+  if (!req.session.userId) return null;
+
+  const result = await pool.query(
+    'SELECT id, name FROM users WHERE id = $1',
+    [req.session.userId]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function requireLogin(req, res, next) {
   if (!req.session.userId) {
     return res.redirect('/login');
   }
-  next();
+
+  try {
+    const user = await findSessionUser(req);
+    if (!user) {
+      req.session = null;
+      return res.redirect('/login');
+    }
+
+    req.session.userName = user.name;
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
-function redirectIfLoggedIn(req, res, next) {
-  if (req.session.userId) {
-    return res.redirect('/dashboard');
+async function redirectIfLoggedIn(req, res, next) {
+  if (!req.session.userId) return next();
+
+  try {
+    const user = await findSessionUser(req);
+    if (user) {
+      req.session.userName = user.name;
+      return res.redirect('/dashboard');
+    }
+
+    req.session = null;
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 }
 
 /** Makes res.locals.flash / res.locals.currentUser / res.locals.csrfToken available in every view. */

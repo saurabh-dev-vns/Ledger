@@ -8,28 +8,116 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
+
 <% if (currentUser) { %>
+
 <header class="topbar">
   <div class="topbar-inner">
-    <a href="/dashboard" class="brand">Ledger<span class="brand-dot">.</span></a>
-    <nav class="topnav">
+
+    <a href="/dashboard" class="brand">
+      Ledger<span class="brand-dot">.</span>
+    </a>
+
+    <button
+      class="nav-toggle"
+      type="button"
+      aria-label="Open navigation"
+      aria-expanded="false"
+      aria-controls="main-navigation"
+    >
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <nav class="topnav" id="main-navigation">
       <a href="/dashboard" class="<%= pageTitle === 'Dashboard' ? 'active' : '' %>">Dashboard</a>
-      <a href="/expenses" class="<%= pageTitle === 'All expenses' ? 'active' : '' %>">All expenses</a>
+      <a href="/expenses" class="<%= pageTitle === 'All expenses' ? 'active' : '' %>">Expenses</a>
       <a href="/add-expense" class="<%= pageTitle === 'Add expense' ? 'active' : '' %>">Add expense</a>
-      <a href="/add-balance" class="<%= pageTitle === 'Add balance' ? 'active' : '' %>">Add balance</a>
+      <a href="/accounts" class="<%= pageTitle === 'Accounts' ? 'active' : '' %>">Accounts</a>
+      <a href="/budgets" class="<%= pageTitle === 'Budgets' ? 'active' : '' %>">Budgets</a>
+      <a href="/loans" class="<%= pageTitle === 'Money owed' ? 'active' : '' %>">Money owed</a>
+      <a href="/transactions" class="<%= pageTitle === 'Transactions' ? 'active' : '' %>">Transactions</a>
+      <a href="/reports" class="<%= pageTitle === 'Reports' ? 'active' : '' %>">Reports</a>
+      <div class="topbar-user">
+        <span class="topbar-username"><%= currentUser.name %></span>
+        <form method="POST" action="/logout">
+          <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+          <button type="submit" class="logout-link">Sign out</button>
+        </form>
+      </div>
     </nav>
-    <div class="topbar-user">
-      <span><%= currentUser.name %></span>
-      <form method="POST" action="/logout" style="display:inline">
-        <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
-        <button type="submit" class="logout-link">Sign out</button>
-      </form>
-    </div>
+
   </div>
 </header>
+
 <% } %>
+
+<% if (currentUser) { %>
+
+<script>
+  (() => {
+    const toggle = document.querySelector('.nav-toggle');
+    const nav = document.querySelector('#main-navigation');
+
+    if (!toggle || !nav) return;
+
+    const closeNavigation = () => {
+      nav.classList.remove('open');
+      toggle.classList.remove('open');
+
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', 'Open navigation');
+    };
+
+    toggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+
+      const isOpen = nav.classList.toggle('open');
+
+      toggle.classList.toggle('open', isOpen);
+
+      toggle.setAttribute(
+        'aria-expanded',
+        String(isOpen)
+      );
+
+      toggle.setAttribute(
+        'aria-label',
+        isOpen ? 'Close navigation' : 'Open navigation'
+      );
+    });
+
+    nav.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', closeNavigation);
+    });
+
+    document.addEventListener('click', (event) => {
+      if (
+        nav.classList.contains('open') &&
+        !nav.contains(event.target) &&
+        !toggle.contains(event.target)
+      ) {
+        closeNavigation();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 720) {
+        closeNavigation();
+      }
+    });
+  })();
+</script>
+
+<% } %>
+
 <main class="page">
+
 <% if (flash) { %>
-  <div class="flash flash-<%= flash.type %>"><%= flash.message %></div>
+  <div class="flash flash-<%= flash.type %>">
+    <%= flash.message %>
+  </div>
 <% } %>

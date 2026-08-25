@@ -1,0 +1,6 @@
+<%- include('partials/header') %>
+<div class="page-head"><p class="eyebrow">Money</p><h1>Accounts</h1><p class="sub">Keep cash, UPI, bank accounts, cards and other balances separate.</p></div>
+<div class="grid-2">
+  <div class="card"><h2>Add account</h2><form method="POST" action="/accounts" class="form"><input type="hidden" name="csrf_token" value="<%= csrfToken %>"><label>Name<input name="name" required placeholder="e.g. HDFC Bank"></label><label>Type<select name="type"><% accountTypes.forEach(t=>{ %><option value="<%= t %>"><%= t[0].toUpperCase()+t.slice(1) %></option><% }) %></select></label><label>Opening balance<input type="number" name="balance" step="0.01" min="0" value="0"></label><button class="btn btn-primary btn-block">Create account</button></form></div>
+  <div class="card"><h2>Your accounts</h2><div class="account-list"><% accounts.forEach(a=>{ %><div class="account-item"><div><strong><%= a.name %></strong><small><%= a.type %></small></div><strong>₹<%= money(a.balance) %></strong><form method="POST" action="/accounts/<%= a.id %>/add" class="inline-form"><input type="hidden" name="csrf_token" value="<%= csrfToken %>"><input type="number" name="amount" step="0.01" min="0.01" placeholder="Add ₹" required><button class="btn btn-secondary">Add</button></form></div><% }) %></div></div>
+</div><%- include('partials/footer') %>

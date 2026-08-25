@@ -1,6 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const db = require('../db/init');
+const { pool } = require('../db/init');
 const wallet = require('../utils/wallet');
 const { redirectIfLoggedIn, setFlash, checkCsrf } = require('../middleware/auth');
 
@@ -10,7 +10,7 @@ router.get('/register', redirectIfLoggedIn, (req, res) => {
   res.render('register', { pageTitle: 'Create account' });
 });
 
-router.post('/register', redirectIfLoggedIn, checkCsrf, (req, res) => {
+router.post('/register', redirectIfLoggedIn, checkCsrf, async (req, res, next) => {
   const name = (req.body.name || '').trim();
   const email = (req.body.email || '').trim().toLowerCase();
   const password = req.body.password || '';
@@ -27,20 +27,40 @@ router.post('/register', redirectIfLoggedIn, checkCsrf, (req, res) => {
   } else if (password !== confirm) {
     setFlash(req, 'Passwords do not match.');
   } else {
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-    if (existing) {
-      setFlash(req, 'An account with that email already exists.');
-    } else {
-      const hash = bcrypt.hashSync(password, 10);
-      const info = db.prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)')
-        .run(name, email, hash);
-      wallet.ensureWallet(info.lastInsertRowid);
+    try {
+      const existingResult = await pool.query(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      );
 
-      req.session.userId = info.lastInsertRowid;
-      req.session.userName = name;
-      return res.redirect('/dashboard');
+      if (existingResult.rows[0]) {
+        setFlash(req, 'An account with that email already exists.');
+      } else {
+        const hash = await bcrypt.hash(password, 10);
+        const result = await pool.query(
+          `INSERT INTO users (name, email, password_hash)
+           VALUES ($1, $2, $3)
+           RETURNING id`,
+          [name, email, hash]
+        );
+
+        const userId = result.rows[0].id;
+        await wallet.ensureWallet(userId);
+
+        req.session.userId = userId;
+        req.session.userName = name;
+        return res.redirect('/dashboard');
+      }
+    } catch (err) {
+      // PostgreSQL unique constraint can still win if two registrations race.
+      if (err.code === '23505') {
+        setFlash(req, 'An account with that email already exists.');
+      } else {
+        return next(err);
+      }
     }
   }
+
   res.redirect('/register');
 });
 
@@ -48,20 +68,29 @@ router.get('/login', redirectIfLoggedIn, (req, res) => {
   res.render('login', { pageTitle: 'Sign in' });
 });
 
-router.post('/login', redirectIfLoggedIn, checkCsrf, (req, res) => {
+router.post('/login', redirectIfLoggedIn, checkCsrf, async (req, res, next) => {
   const email = (req.body.email || '').trim().toLowerCase();
   const password = req.body.password || '';
 
-  const user = db.prepare('SELECT id, name, password_hash FROM users WHERE email = ?').get(email);
+  try {
+    const result = await pool.query(
+      'SELECT id, name, password_hash FROM users WHERE email = $1',
+      [email]
+    );
 
-  if (user && bcrypt.compareSync(password, user.password_hash)) {
-    req.session.userId = user.id;
-    req.session.userName = user.name;
-    return res.redirect('/dashboard');
+    const user = result.rows[0];
+
+    if (user && await bcrypt.compare(password, user.password_hash)) {
+      req.session.userId = user.id;
+      req.session.userName = user.name;
+      return res.redirect('/dashboard');
+    }
+
+    setFlash(req, 'Incorrect email or password.');
+    res.redirect('/login');
+  } catch (err) {
+    next(err);
   }
-
-  setFlash(req, 'Incorrect email or password.');
-  res.redirect('/login');
 });
 
 router.post('/logout', (req, res) => {

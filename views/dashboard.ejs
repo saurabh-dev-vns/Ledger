@@ -1,83 +1,11 @@
 <%- include('partials/header') %>
-<div class="page-head">
-  <p class="eyebrow">Overview</p>
-  <h1>Welcome back, <%= currentUser.name %></h1>
-  <p class="sub">Here's where things stand right now.</p>
-</div>
-
-<div class="ledger-summary">
-  <div class="ledger-stitch"></div>
-  <div class="ledger-summary-inner">
-    <div class="ledger-total">
-      <span class="ledger-total-label">Total balance</span>
-      <span class="ledger-total-figure">₹<%= money(total) %></span>
-    </div>
-    <div class="ledger-split">
-      <div class="ledger-split-item">
-        <span class="dot dot-cash"></span> Cash
-        <strong>₹<%= money(wallet.cash_balance) %></strong>
-      </div>
-      <div class="ledger-split-item">
-        <span class="dot dot-online"></span> Online
-        <strong>₹<%= money(wallet.online_balance) %></strong>
-      </div>
-      <div class="ledger-split-item">
-        <span class="dot dot-spent"></span> Spent this month
-        <strong>₹<%= money(monthTotal) %></strong>
-      </div>
-    </div>
-    <div class="ledger-actions">
-      <a href="/add-balance" class="btn btn-secondary">Add balance</a>
-      <a href="/add-expense" class="btn btn-primary">Add expense</a>
-    </div>
-  </div>
-</div>
-
+<div class="page-head"><p class="eyebrow">Overview</p><h1>Welcome back, <%= currentUser.name %></h1><p class="sub">Your money at a glance.</p></div>
+<div class="ledger-summary"><div class="ledger-stitch"></div><div class="ledger-summary-inner"><span class="ledger-total-label">Total across accounts</span><span class="ledger-total-figure">₹<%= money(total) %></span><div class="ledger-split"><% accounts.forEach(a=>{ %><div class="ledger-split-item"><span class="dot <%= a.type==='cash'?'dot-cash':a.type==='online'?'dot-online':'dot-spent' %>"></span><%= a.name %> <strong>₹<%= money(a.balance) %></strong></div><% }) %><div class="ledger-split-item"><span class="dot dot-spent"></span>Spent this month <strong>₹<%= money(monthTotal) %></strong></div></div><div class="ledger-actions"><a href="/add-balance" class="btn btn-secondary">Add balance</a><a href="/swap-balance" class="btn btn-secondary">Transfer</a><a href="/add-expense" class="btn btn-primary">Add expense</a></div></div></div>
 <div class="grid-2">
-  <div class="card">
-    <div class="card-head">
-      <h2>Recent expenses</h2>
-      <a href="/expenses" class="link-more">View all →</a>
-    </div>
-    <% if (!recent.length) { %>
-      <p class="empty">Nothing logged yet. Your first entry will show up here.</p>
-    <% } else { %>
-      <table class="ledger-table">
-        <tbody>
-        <% recent.forEach(row => { %>
-          <tr>
-            <td class="col-date"><%= formatDate(row.spent_on) %></td>
-            <td>
-              <span class="cat-tag"><%= row.category %></span>
-              <% if (row.notes) { %><div class="row-note"><%= row.notes %></div><% } %>
-            </td>
-            <td class="col-method"><%= row.payment_method[0].toUpperCase() + row.payment_method.slice(1) %></td>
-            <td class="col-amount">₹<%= money(row.amount) %></td>
-          </tr>
-        <% }) %>
-        </tbody>
-      </table>
-    <% } %>
-  </div>
-
-  <div class="card">
-    <h2>This month by category</h2>
-    <% if (!byCategory.length) { %>
-      <p class="empty">No spending recorded this month yet.</p>
-    <% } else { %>
-      <div class="bar-list">
-        <% byCategory.forEach(row => {
-             const pct = maxCategory > 0 ? Math.round((row.total / maxCategory) * 100) : 0; %>
-          <div class="bar-item">
-            <div class="bar-item-head">
-              <span><%= row.category %></span>
-              <span>₹<%= money(row.total) %></span>
-            </div>
-            <div class="bar-track"><div class="bar-fill" style="width: <%= pct %>%"></div></div>
-          </div>
-        <% }) %>
-      </div>
-    <% } %>
-  </div>
-</div>
-<%- include('partials/footer') %>
+<div class="card"><div class="card-head"><h2>Recent expenses</h2><a href="/expenses" class="link-more">View all →</a></div><% if(!recent.length){ %><p class="empty">No expenses yet.</p><% }else{ %><table class="ledger-table"><tbody><% recent.forEach(r=>{ %><tr><td class="col-date"><%= formatDate(r.spent_on) %></td><td><span class="cat-tag"><%= r.category %></span><% if(r.notes){ %><div class="row-note"><%= r.notes %></div><% } %></td><td class="col-method"><%= r.account_name||r.payment_method %></td><td class="col-amount">₹<%= money(r.amount) %></td></tr><% }) %></tbody></table><% } %></div>
+<div class="card"><h2>This month by category</h2><% if(!byCategory.length){ %><p class="empty">No spending this month.</p><% }else{ %><div class="bar-list"><% byCategory.forEach(r=>{const pct=maxCategory?Math.round(r.total/maxCategory*100):0;%><div><div class="bar-item-head"><span><%= r.category %></span><span>₹<%= money(r.total) %></span></div><div class="bar-track"><div class="bar-fill" style="width:<%=pct%>%"></div></div></div><% }) %></div><% } %></div>
+<div class="card"><h2>Monthly spending</h2><div class="trend-list"><% trend.forEach(r=>{ %><div class="trend-row"><span><%= r.month %></span><div class="bar-track"><div class="bar-fill" style="width:<%= trend.length?Math.round(r.total/Math.max(...trend.map(x=>x.total),1)*100):0 %>%"></div></div><strong>₹<%= money(r.total) %></strong></div><% }) %></div></div>
+<div class="card"><div class="card-head"><h2>Budget status</h2><a href="/budgets" class="link-more">Manage →</a></div><% if(!budgets.length){ %><p class="empty">No budgets set.</p><% }else{budgets.forEach(b=>{const pct=Math.min(100,Math.round(b.spent/b.amount*100));%><div class="budget-mini"><div class="bar-item-head"><span><%= b.category %></span><span>₹<%= money(b.spent) %> / ₹<%= money(b.amount) %></span></div><div class="bar-track"><div class="bar-fill <%=pct>=100?'over':''%>" style="width:<%=pct%>%"></div></div></div><%})}%></div>
+<div class="card"><div class="card-head"><h2>Money owed</h2><a href="/loans" class="link-more">Manage →</a></div><% if(!loans.length){ %><p class="empty">No open loans.</p><% }else{loans.slice(0,5).forEach(l=>{ %><div class="loan-summary-row"><span><%= l.person %> · <%= l.direction==='owed_to_me'?'owes you':'you owe' %></span><strong>₹<%= money(l.remaining_amount) %></strong></div><%})}%></div>
+<div class="card"><div class="card-head"><h2>Recent transfers</h2><a href="/swap-balance" class="link-more">Transfer →</a></div><% if(!recentTransfers.length){ %><p class="empty">No transfers yet.</p><% }else{recentTransfers.forEach(r=>{ %><div class="transfer-row"><span><%= r.from_name||r.from_type %> → <%= r.to_name||r.to_type %></span><strong>₹<%= money(r.amount) %></strong></div><%})}%></div>
+</div><%- include('partials/footer') %>
