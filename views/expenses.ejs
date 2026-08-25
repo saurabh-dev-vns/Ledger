@@ -1,0 +1,38 @@
+<%- include('partials/header') %>
+<div class="page-head">
+  <p class="eyebrow">History</p>
+  <h1>All expenses</h1>
+  <p class="sub"><%= expenses.length %> entries · ₹<%= money(total) %> total logged</p>
+</div>
+
+<div class="card">
+  <% if (!expenses.length) { %>
+    <p class="empty">No expenses yet. <a href="/add-expense">Add your first one</a>.</p>
+  <% } else { %>
+    <table class="ledger-table ledger-table-full">
+      <thead>
+        <tr>
+          <th>Date</th><th>Category</th><th>Notes</th><th>Method</th><th class="col-amount">Amount</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      <% expenses.forEach(row => { %>
+        <tr>
+          <td class="col-date"><%= formatDate(row.spent_on, true) %></td>
+          <td><span class="cat-tag"><%= row.category %></span></td>
+          <td class="row-note"><%= row.notes || '—' %></td>
+          <td class="col-method"><%= row.payment_method[0].toUpperCase() + row.payment_method.slice(1) %></td>
+          <td class="col-amount">₹<%= money(row.amount) %></td>
+          <td class="col-action">
+            <form method="POST" action="/expenses/<%= row.id %>/delete" onsubmit="return confirm('Delete this expense? The amount will be credited back to your wallet.');">
+              <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+              <button type="submit" class="btn-link-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+<%- include('partials/footer') %>

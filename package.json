@@ -1,0 +1,20 @@
+{
+  "name": "ledger-expense-tracker",
+  "version": "1.0.0",
+  "description": "Expense tracker with cash/online wallets, auto-recalculated balances, and a dashboard — Node.js + Express + SQLite (built-in node:sqlite, no native modules).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-session": "^2.1.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

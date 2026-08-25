@@ -1,0 +1,20 @@
+<%- include('partials/header') %>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <p class="auth-eyebrow">Welcome back</p>
+    <h1>Sign in</h1>
+    <p class="auth-sub">Pick up your ledger where you left off.</p>
+    <form method="POST" action="/login" class="form">
+      <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+      <label>Email
+        <input type="email" name="email" required autofocus>
+      </label>
+      <label>Password
+        <input type="password" name="password" required>
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+    <p class="auth-switch">New here? <a href="/register">Create an account</a></p>
+  </div>
+</div>
+<%- include('partials/footer') %>

@@ -1,0 +1,45 @@
+<%- include('partials/header') %>
+<div class="page-head">
+  <p class="eyebrow">Wallet</p>
+  <h1>Add balance</h1>
+  <p class="sub">Top up either wallet — your dashboard totals update immediately.</p>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Top up</h2>
+    <form method="POST" action="/add-balance" class="form">
+      <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+      <label>Wallet
+        <select name="type" required>
+          <option value="cash">Cash</option>
+          <option value="online">Online</option>
+        </select>
+      </label>
+      <label>Amount (₹)
+        <input type="number" name="amount" step="0.01" min="0.01" required autofocus>
+      </label>
+      <label>Note <span class="optional">optional</span>
+        <input type="text" name="note" placeholder="e.g. Salary, top-up, transfer">
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Add to wallet</button>
+    </form>
+  </div>
+
+  <div class="card balance-summary">
+    <h2>Current balances</h2>
+    <div class="balance-row">
+      <span class="balance-label">Cash</span>
+      <span class="balance-figure">₹<%= money(wallet.cash_balance) %></span>
+    </div>
+    <div class="balance-row">
+      <span class="balance-label">Online</span>
+      <span class="balance-figure">₹<%= money(wallet.online_balance) %></span>
+    </div>
+    <div class="balance-row balance-total">
+      <span class="balance-label">Total</span>
+      <span class="balance-figure">₹<%= money(wallet.cash_balance + wallet.online_balance) %></span>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>
