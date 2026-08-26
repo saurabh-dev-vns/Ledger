@@ -9,6 +9,9 @@ const authRoutes = require('./routes/auth');
 const appRoutes = require('./routes/app');
 
 const app = express();
+
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 3000;
 
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
