@@ -74,7 +74,7 @@ function checkCsrf(req, res, next) {
   const token = req.body.csrf_token;
   if (!token || token !== req.session.csrfToken) {
     setFlash(req, 'Your session expired. Please try again.');
-    return res.redirect('back');
+    return res.redirect(req.get('Referrer') || '/register');
   }
   next();
 }
