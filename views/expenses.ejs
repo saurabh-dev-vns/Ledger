@@ -1,4 +1,172 @@
 <%- include('partials/header') %>
-<div class="page-head"><p class="eyebrow">History</p><h1>All expenses</h1><p class="sub"><%= expenses.length %> entries · ₹<%= money(total) %> total logged</p></div>
-<div class="card"><form method="GET" action="/expenses" class="filter-form"><label>Category<select name="category"><option value="">All categories</option><% categories.forEach(c=>{ %><option value="<%=c%>" <%=filters.category===c?'selected':''%>><%=c%></option><% }) %></select></label><label>Account type<select name="method"><option value="">All</option><option value="cash" <%=filters.method==='cash'?'selected':''%>>Cash</option><option value="online" <%=filters.method==='online'?'selected':''%>>Online</option><option value="bank" <%=filters.method==='bank'?'selected':''%>>Bank</option><option value="credit" <%=filters.method==='credit'?'selected':''%>>Credit</option><option value="other" <%=filters.method==='other'?'selected':''%>>Other</option></select></label><label>From<input type="date" name="from" value="<%=filters.from%>"></label><label>To<input type="date" name="to" value="<%=filters.to%>"></label><button class="btn btn-secondary">Filter</button><a href="/expenses" class="btn btn-secondary">Clear</a></form></div>
-<div class="card"><% if(!expenses.length){ %><p class="empty">No expenses found.</p><% }else{ %><div style="overflow-x:auto"><table class="ledger-table ledger-table-full"><thead><tr><th>Date</th><th>Category</th><th>Notes</th><th>Account</th><th class="col-amount">Amount</th><th></th></tr></thead><tbody><%expenses.forEach(row=>{ %><tr><td class="col-date"><%=formatDate(row.spent_on)%></td><td><span class="cat-tag"><%=row.category%></span></td><td class="row-note"><%=row.notes||'—'%></td><td class="col-method"><%=row.account_name||row.payment_method%></td><td class="col-amount">₹<%=money(row.amount)%></td><td class="col-action"><form method="POST" action="/expenses/<%=row.id%>/delete" onsubmit="return confirm('Delete this expense? The amount will be credited back.');"><input type="hidden" name="csrf_token" value="<%=csrfToken%>"><button class="btn-link-danger">Delete</button></form></td></tr><%})%></tbody></table></div><%}%></div><%- include('partials/footer') %>
+
+<div class="page-head">
+    <p class="eyebrow">History</p>
+    <h1>All expenses</h1>
+    <p class="sub">
+        <%= expenses.length %> entries · ₹<%= money(total) %> total logged
+    </p>
+</div>
+
+<div class="card">
+    <form method="GET" action="/expenses" class="filter-form">
+        <label>
+            Category
+            <select name="category">
+                <option value="">All categories</option>
+
+                <% categories.forEach(c=>{ %>
+                    <option
+                        value="<%=c%>"
+                        <%=filters.category===c?'selected':''%>
+                    >
+                        <%=c%>
+                    </option>
+                <% }) %>
+            </select>
+        </label>
+
+        <label>
+            Account type
+            <select name="method">
+                <option value="">All</option>
+
+                <option
+                    value="cash"
+                    <%=filters.method==='cash'?'selected':''%>
+                >
+                    Cash
+                </option>
+
+                <option
+                    value="online"
+                    <%=filters.method==='online'?'selected':''%>
+                >
+                    Online
+                </option>
+
+                <option
+                    value="bank"
+                    <%=filters.method==='bank'?'selected':''%>
+                >
+                    Bank
+                </option>
+
+                <option
+                    value="credit"
+                    <%=filters.method==='credit'?'selected':''%>
+                >
+                    Credit
+                </option>
+
+                <option
+                    value="other"
+                    <%=filters.method==='other'?'selected':''%>
+                >
+                    Other
+                </option>
+            </select>
+        </label>
+
+        <label>
+            From
+            <input
+                type="date"
+                name="from"
+                value="<%=filters.from%>"
+            >
+        </label>
+
+        <label>
+            To
+            <input
+                type="date"
+                name="to"
+                value="<%=filters.to%>"
+            >
+        </label>
+
+        <button class="btn btn-secondary">
+            Filter
+        </button>
+
+        <a href="/expenses" class="btn btn-secondary">
+            Clear
+        </a>
+    </form>
+</div>
+
+<div class="card">
+    <% if(!expenses.length){ %>
+
+        <p class="empty">
+            No expenses found.
+        </p>
+
+    <% }else{ %>
+
+        <div style="overflow-x:auto">
+            <table class="ledger-table ledger-table-full">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Notes</th>
+                        <th>Account</th>
+                        <th class="col-amount">Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <%expenses.forEach(row=>{ %>
+                        <tr>
+                            <td class="col-date">
+                                <%=formatDate(row.spent_on)%>
+                            </td>
+
+                            <td>
+                                <span class="cat-tag">
+                                    <%=row.category%>
+                                </span>
+                            </td>
+
+                            <td class="row-note">
+                                <%=row.notes||'—'%>
+                            </td>
+
+                            <td class="col-method">
+                                <%=row.account_name||row.payment_method%>
+                            </td>
+
+                            <td class="col-amount">
+                                ₹<%=money(row.amount)%>
+                            </td>
+
+                            <td class="col-action">
+                                <form
+                                    method="POST"
+                                    action="/expenses/<%=row.id%>/delete"
+                                    onsubmit="return confirm('Delete this expense? The amount will be credited back.');"
+                                >
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        value="<%=csrfToken%>"
+                                    >
+
+                                    <button class="btn-link-danger">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    <%})%>
+                </tbody>
+            </table>
+        </div>
+
+    <%}%>
+</div>
+
+<%- include('partials/footer') %>

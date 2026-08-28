@@ -1,2 +1,74 @@
 <%- include('partials/header') %>
-<div class="page-head"><p class="eyebrow">Money</p><h1>Add balance</h1><p class="sub">Top up any account.</p></div><div class="grid-2"><div class="card"><h2>Top up</h2><form method="POST" action="/add-balance" class="form"><input type="hidden" name="csrf_token" value="<%= csrfToken %>"><label>Account<select name="account_id" required><% accounts.forEach(a=>{ %><option value="<%=a.id%>"><%=a.name%> — ₹<%=money(a.balance)%></option><% }) %></select></label><label>Amount (₹)<input type="number" name="amount" step="0.01" min="0.01" required></label><label>Note <span class="optional">optional</span><input type="text" name="note" maxlength="500"></label><button class="btn btn-primary btn-block">Add to account</button></form></div><div class="card"><h2>Current balances</h2><% accounts.forEach(a=>{ %><div class="balance-row"><span><%=a.name%></span><span class="balance-figure">₹<%=money(a.balance)%></span></div><% }) %></div></div><%- include('partials/footer') %>
+
+<div class="page-head">
+    <p class="eyebrow">Money</p>
+    <h1>Add balance</h1>
+    <p class="sub">Top up any account.</p>
+</div>
+
+<div class="grid-2">
+
+    <div class="card">
+        <h2>Top up</h2>
+
+        <form method="POST" action="/add-balance" class="form">
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="<%= csrfToken %>"
+            >
+
+            <label>
+                Account
+                <select name="account_id" required>
+                    <% accounts.forEach(a=>{ %>
+                        <option value="<%=a.id%>">
+                            <%=a.name%> — ₹<%=money(a.balance)%>
+                        </option>
+                    <% }) %>
+                </select>
+            </label>
+
+            <label>
+                Amount (₹)
+                <input
+                    type="number"
+                    name="amount"
+                    step="0.01"
+                    min="0.01"
+                    required
+                >
+            </label>
+
+            <label>
+                Note
+                <span class="optional">optional</span>
+                <input
+                    type="text"
+                    name="note"
+                    maxlength="500"
+                >
+            </label>
+
+            <button class="btn btn-primary btn-block">
+                Add to account
+            </button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Current balances</h2>
+
+        <% accounts.forEach(a=>{ %>
+            <div class="balance-row">
+                <span><%=a.name%></span>
+                <span class="balance-figure">
+                    ₹<%=money(a.balance)%>
+                </span>
+            </div>
+        <% }) %>
+    </div>
+
+</div>
+
+<%- include('partials/footer') %>

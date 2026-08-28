@@ -1,4 +1,118 @@
 <%- include('partials/header') %>
-<div class="page-head"><p class="eyebrow">Ledger</p><h1>Transactions</h1><p class="sub">Expenses and account transfers in one timeline.</p></div>
-<div class="card"><form method="GET" action="/transactions" class="filter-form"><label>From<input type="date" name="from" value="<%= filters.from %>"></label><label>To<input type="date" name="to" value="<%= filters.to %>"></label><button class="btn btn-secondary">Filter</button><a href="/transactions" class="btn btn-secondary">Clear</a></form></div>
-<div class="card"><% if(!transactions.length){ %><p class="empty">No transactions found.</p><% } else { %><table class="ledger-table ledger-table-full"><thead><tr><th>Date</th><th>Type</th><th>Details</th><th>Account</th><th class="col-amount">Amount</th></tr></thead><tbody><% transactions.forEach(t=>{ %><tr><td class="col-date"><%= formatDate(t.date) %></td><td><span class="cat-tag"><%= t.kind==='expense'?'Expense':'Transfer' %></span></td><td><% if(t.kind==='expense'){ %><%= t.category %><% if(t.notes){ %><div class="row-note"><%= t.notes %></div><% } %><% } else { %><%= t.from_name || t.from_type %> → <%= t.to_name || t.to_type %><% if(t.note){ %><div class="row-note"><%= t.note %></div><% } %><% } %></td><td class="col-method"><%= t.kind==='expense'?(t.account_name||t.payment_method):'—' %></td><td class="col-amount"><%= t.kind==='expense'?'−':'↔' %> ₹<%= money(t.amount) %></td></tr><% }) %></tbody></table><% } %></div><%- include('partials/footer') %>
+
+<div class="page-head">
+    <p class="eyebrow">Ledger</p>
+    <h1>Transactions</h1>
+    <p class="sub">
+        Expenses and account transfers in one timeline.
+    </p>
+</div>
+
+<div class="card">
+    <form method="GET" action="/transactions" class="filter-form">
+        <label>
+            From
+            <input
+                type="date"
+                name="from"
+                value="<%= filters.from %>"
+            >
+        </label>
+
+        <label>
+            To
+            <input
+                type="date"
+                name="to"
+                value="<%= filters.to %>"
+            >
+        </label>
+
+        <button class="btn btn-secondary">
+            Filter
+        </button>
+
+        <a href="/transactions" class="btn btn-secondary">
+            Clear
+        </a>
+    </form>
+</div>
+
+<div class="card">
+    <% if(!transactions.length){ %>
+
+        <p class="empty">
+            No transactions found.
+        </p>
+
+    <% } else { %>
+
+        <table class="ledger-table ledger-table-full">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Details</th>
+                    <th>Account</th>
+                    <th class="col-amount">Amount</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <% transactions.forEach(t=>{ %>
+                    <tr>
+                        <td class="col-date">
+                            <%= formatDate(t.date) %>
+                        </td>
+
+                        <td>
+                            <span class="cat-tag">
+                                <%= t.kind==='expense'?'Expense':'Transfer' %>
+                            </span>
+                        </td>
+
+                        <td>
+                            <% if(t.kind==='expense'){ %>
+
+                                <%= t.category %>
+
+                                <% if(t.notes){ %>
+                                    <div class="row-note">
+                                        <%= t.notes %>
+                                    </div>
+                                <% } %>
+
+                            <% } else { %>
+
+                                <%= t.from_name || t.from_type %>
+                                →
+                                <%= t.to_name || t.to_type %>
+
+                                <% if(t.note){ %>
+                                    <div class="row-note">
+                                        <%= t.note %>
+                                    </div>
+                                <% } %>
+
+                            <% } %>
+                        </td>
+
+                        <td class="col-method">
+                            <%= t.kind==='expense'
+                                ? (t.account_name||t.payment_method)
+                                : '—' %>
+                        </td>
+
+                        <td class="col-amount">
+                            <%= t.kind==='expense'?'−':'↔' %>
+                            ₹<%= money(t.amount) %>
+                        </td>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+
+    <% } %>
+</div>
+
+<%- include('partials/footer') %>

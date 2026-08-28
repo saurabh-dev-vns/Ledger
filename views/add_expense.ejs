@@ -1,3 +1,109 @@
 <%- include('partials/header') %>
-<div class="page-head"><p class="eyebrow">Spending</p><h1>Add expense</h1><p class="sub">Choose the exact account you paid from.</p></div>
-<div class="grid-2"><div class="card"><h2>New entry</h2><form method="POST" action="/add-expense" class="form"><input type="hidden" name="csrf_token" value="<%= csrfToken %>"><label>Amount (₹)<input type="number" name="amount" step="0.01" min="0.01" required autofocus></label><label>Notes <span class="optional">optional</span><input type="text" name="notes" maxlength="500" placeholder="e.g. Groceries"></label><div class="form-row"><label>Account<select name="account_id" required><% accounts.forEach(a=>{ %><option value="<%= a.id %>"><%= a.name %> — ₹<%= money(a.balance) %></option><% }) %></select></label><label>Category<select name="category" required><% categories.forEach(c=>{ %><option><%= c %></option><% }) %></select></label></div><input type="hidden" name="payment_method" value="cash"><label>Date<input type="date" name="spent_on" value="<%= today %>" required></label><button class="btn btn-primary btn-block">Save expense</button></form></div><div class="card"><h2>Accounts</h2><div class="account-list"><% accounts.forEach(a=>{ %><div class="account-item"><span><%= a.name %></span><strong>₹<%= money(a.balance) %></strong></div><% }) %></div><p class="hint">If an account runs short, the expense will be rejected instead of making the balance negative.</p></div></div><%- include('partials/footer') %>
+
+<div class="page-head">
+    <p class="eyebrow">Spending</p>
+    <h1>Add expense</h1>
+    <p class="sub">Choose the exact account you paid from.</p>
+</div>
+
+<div class="grid-2">
+
+    <div class="card">
+        <h2>New entry</h2>
+
+        <form method="POST" action="/add-expense" class="form">
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="<%= csrfToken %>"
+            >
+
+            <label>
+                Amount (₹)
+                <input
+                    type="number"
+                    name="amount"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    autofocus
+                >
+            </label>
+
+            <label>
+                Notes
+                <span class="optional">optional</span>
+                <input
+                    type="text"
+                    name="notes"
+                    maxlength="500"
+                    placeholder="e.g. Groceries"
+                >
+            </label>
+
+            <div class="form-row">
+                <label>
+                    Account
+                    <select name="account_id" required>
+                        <% accounts.forEach(a=>{ %>
+                            <option value="<%= a.id %>">
+                                <%= a.name %> — ₹<%= money(a.balance) %>
+                            </option>
+                        <% }) %>
+                    </select>
+                </label>
+
+                <label>
+                    Category
+                    <select name="category" required>
+                        <% categories.forEach(c=>{ %>
+                            <option>
+                                <%= c %>
+                            </option>
+                        <% }) %>
+                    </select>
+                </label>
+            </div>
+
+            <input
+                type="hidden"
+                name="payment_method"
+                value="cash"
+            >
+
+            <label>
+                Date
+                <input
+                    type="date"
+                    name="spent_on"
+                    value="<%= today %>"
+                    required
+                >
+            </label>
+
+            <button class="btn btn-primary btn-block">
+                Save expense
+            </button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Accounts</h2>
+
+        <div class="account-list">
+            <% accounts.forEach(a=>{ %>
+                <div class="account-item">
+                    <span><%= a.name %></span>
+                    <strong>₹<%= money(a.balance) %></strong>
+                </div>
+            <% }) %>
+        </div>
+
+        <p class="hint">
+            If an account runs short, the expense will be rejected instead of making the balance negative.
+        </p>
+    </div>
+
+</div>
+
+<%- include('partials/footer') %>
