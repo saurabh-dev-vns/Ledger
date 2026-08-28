@@ -1,6 +1,132 @@
 <%- include('partials/header') %>
-<div class="page-head"><p class="eyebrow">Insights</p><h1>Monthly report</h1><p class="sub">A focused view of your spending for the selected month.</p></div>
-<div class="card"><form method="GET" action="/reports" class="filter-form"><label>Month<input type="month" name="month" value="<%=month%>"></label><button class="btn btn-primary">Generate report</button></form></div>
-<div class="grid-2"><div class="card"><span class="ledger-total-label">Total spent</span><div class="ledger-total-figure">₹<%=money(total)%></div><p class="hint"><%=expenses.length%> expense entries in <%=month%>.</p></div><div class="card"><h2>Category breakdown</h2><%if(!categories.length){%><p class="empty">No spending recorded.</p><%}else{const max=Math.max(...categories.map(x=>x.total));%><div class="bar-list"><%categories.forEach(c=>{const pct=Math.round(c.total/max*100);%><div><div class="bar-item-head"><span><%=c.category%></span><span>₹<%=money(c.total)%></span></div><div class="bar-track"><div class="bar-fill" style="width:<%=pct%>%"></div></div></div><%})%></div><%}%></div></div>
-<div class="card"><h2>Month in detail</h2><%if(!expenses.length){%><p class="empty">No expenses.</p><%}else{%><div style="overflow-x:auto"><table class="ledger-table ledger-table-full"><thead><tr><th>Date</th><th>Category</th><th>Account</th><th class="col-amount">Amount</th></tr></thead><tbody><%expenses.forEach(e=>{%><tr><td class="col-date"><%=e.spent_on%></td><td><span class="cat-tag"><%=e.category%></span></td><td><%=e.account_name||e.payment_method%></td><td class="col-amount">₹<%=money(e.amount)%></td></tr><%})%></tbody></table></div><%}%></div>
+
+<div class="page-head">
+    <p class="eyebrow">Insights</p>
+    <h1>Monthly report</h1>
+    <p class="sub">
+        A focused view of your spending for the selected month.
+    </p>
+</div>
+
+<div class="card">
+    <form method="GET" action="/reports" class="filter-form">
+        <label>
+            Month
+            <input
+                type="month"
+                name="month"
+                value="<%=month%>"
+            >
+        </label>
+
+        <button class="btn btn-primary">
+            Generate report
+        </button>
+    </form>
+</div>
+
+<div class="grid-2">
+
+    <div class="card">
+        <span class="ledger-total-label">
+            Total spent
+        </span>
+
+        <div class="ledger-total-figure">
+            ₹<%=money(total)%>
+        </div>
+
+        <p class="hint">
+            <%=expenses.length%> expense entries in <%=month%>.
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>Category breakdown</h2>
+
+        <%if(!categories.length){%>
+            <p class="empty">
+                No spending recorded.
+            </p>
+        <%}else{const max=Math.max(...categories.map(x=>x.total));%>
+
+            <div class="bar-list">
+                <%categories.forEach(c=>{const pct=Math.round(c.total/max*100);%>
+
+                    <div>
+                        <div class="bar-item-head">
+                            <span>
+                                <%=c.category%>
+                            </span>
+
+                            <span>
+                                ₹<%=money(c.total)%>
+                            </span>
+                        </div>
+
+                        <div class="bar-track">
+                            <div
+                                class="bar-fill"
+                                style="width:<%=pct%>%"
+                            ></div>
+                        </div>
+                    </div>
+
+                <%})%>
+            </div>
+
+        <%}%>
+    </div>
+
+</div>
+
+<div class="card">
+    <h2>Month in detail</h2>
+
+    <%if(!expenses.length){%>
+        <p class="empty">
+            No expenses.
+        </p>
+    <%}else{%>
+
+        <div style="overflow-x:auto">
+            <table class="ledger-table ledger-table-full">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Account</th>
+                        <th class="col-amount">Amount</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <%expenses.forEach(e=>{%>
+                        <tr>
+                            <td class="col-date">
+                                <%=e.spent_on%>
+                            </td>
+
+                            <td>
+                                <span class="cat-tag">
+                                    <%=e.category%>
+                                </span>
+                            </td>
+
+                            <td>
+                                <%=e.account_name||e.payment_method%>
+                            </td>
+
+                            <td class="col-amount">
+                                ₹<%=money(e.amount)%>
+                            </td>
+                        </tr>
+                    <%})%>
+                </tbody>
+            </table>
+        </div>
+
+    <%}%>
+</div>
+
 <%- include('partials/footer') %>
