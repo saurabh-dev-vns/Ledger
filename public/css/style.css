@@ -222,6 +222,13 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  text-decoration: none;
+}
+
+.topbar-username:hover,
+.topbar-username.active {
+  text-decoration: underline;
 }
 
 .topbar-user form {
@@ -877,6 +884,32 @@ textarea:focus {
 
 .btn-block {
   width: 100%;
+}
+
+.btn-danger {
+  background: var(--rust);
+
+  color: var(--paper-raised);
+
+  border-color: var(--rust);
+}
+
+.btn-danger:hover {
+  background: #963f2c;
+}
+
+.danger-zone {
+  border: 1px solid var(--rust);
+
+  background: var(--rust-soft);
+
+  border-radius: 12px;
+
+  padding: 20px;
+}
+
+.danger-zone h2 {
+  color: var(--rust);
 }
 
 

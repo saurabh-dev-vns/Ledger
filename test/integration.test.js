@@ -208,3 +208,93 @@ test('transaction feed combines expenses and transfers', async () => {
     assert.ok(feed.some(f => f.kind === 'expense'), 'feed should include at least one expense');
     assert.ok(feed.some(f => f.kind === 'transfer'), 'feed should include at least one transfer');
 });
+
+test('profile: update name and email', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const newEmail = `updated-${Date.now()}@example.com`;
+
+    const updated = await profileService.updateProfile(user.id, 'Updated Name', newEmail);
+    assert.equal(updated.name, 'Updated Name');
+    assert.equal(updated.email, newEmail);
+
+    const profile = await profileService.getProfile(user.id);
+    assert.equal(profile.name, 'Updated Name');
+    assert.equal(profile.email, newEmail);
+
+    // Restore for subsequent tests that reference userEmail
+    await profileService.updateProfile(user.id, 'Test User', userEmail);
+});
+
+test('profile: cannot change email to one already used by another account', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const otherEmail = `other-${Date.now()}@example.com`;
+    await authService.register({ name: 'Other', email: otherEmail, password: 'password1', confirm: 'password1' });
+
+    await assert.rejects(
+        () => profileService.updateProfile(user.id, 'Test User', otherEmail),
+        /already in use/
+    );
+});
+
+test('profile: stats reflect accounts, expenses, and loans created in earlier tests', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const profile = await profileService.getProfile(user.id);
+
+    assert.ok(profile.stats.accountCount >= 2, 'should include at least the default Cash/Online accounts');
+    assert.ok(profile.stats.expenseCount > 0, 'should include expenses created in earlier tests');
+    assert.ok(profile.stats.totalSpent > 0);
+});
+
+test('profile: changing password requires the correct current password', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+
+    await assert.rejects(
+        () => profileService.changePassword(user.id, 'wrong-current-password', 'newpassword1', 'newpassword1'),
+        /incorrect/i
+    );
+
+    await assert.doesNotReject(
+        () => profileService.changePassword(user.id, 'password1', 'newpassword1', 'newpassword1')
+    );
+
+    // Old password should no longer work; new one should.
+    const oldStillWorks = await authService.login(userEmail, 'password1');
+    assert.equal(oldStillWorks, null);
+
+    const newWorks = await authService.login(userEmail, 'newpassword1');
+    assert.ok(newWorks);
+
+    // Restore original password so later tests (if any) aren't affected.
+    await profileService.changePassword(user.id, 'newpassword1', 'password1', 'password1');
+});
+
+test('profile: deleting the account removes the user and all owned data', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const pool = require('../src/db/pool');
+
+    const email = `delete-me-${Date.now()}@example.com`;
+    const victim = await authService.register({ name: 'Delete Me', email, password: 'password1', confirm: 'password1' });
+
+    const ccId = await accountsService.addAccount(victim.id, 'Card', 'credit', 0, 5000);
+    await expensesService.addExpense(victim.id, 100, 'test', 'credit', 'Shopping', '2026-01-01', ccId);
+    await loansService.addLoan(victim.id, 'Someone', 'owed_to_me', 500, null);
+
+    await assert.rejects(
+        () => profileService.deleteAccount(victim.id, 'wrong-password'),
+        /incorrect/i
+    );
+
+    await profileService.deleteAccount(victim.id, 'password1');
+
+    const userRow = await pool.query('SELECT id FROM users WHERE id = $1', [victim.id]);
+    assert.equal(userRow.rowCount, 0, 'user row should be gone');
+
+    const accountRows = await pool.query('SELECT id FROM accounts WHERE user_id = $1', [victim.id]);
+    assert.equal(accountRows.rowCount, 0, 'accounts should cascade-delete');
+
+    const expenseRows = await pool.query('SELECT id FROM expenses WHERE user_id = $1', [victim.id]);
+    assert.equal(expenseRows.rowCount, 0, 'expenses should cascade-delete');
+
+    const loanRows = await pool.query('SELECT id FROM loans WHERE user_id = $1', [victim.id]);
+    assert.equal(loanRows.rowCount, 0, 'loans should cascade-delete');
+});

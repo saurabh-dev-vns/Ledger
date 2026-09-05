@@ -187,7 +187,8 @@ ledger-expense-tracker/
 │       ├── loans/               # Money owed / owed to you
 │       ├── dashboard/           # Aggregates other modules for the home page
 │       ├── reports/             # Monthly category reports
-│       └── transactions/        # Combined expense + transfer feed
+│       ├── transactions/        # Combined expense + transfer feed
+│       └── profile/             # View/edit name, email, password; delete account
 │           │
 │           ├── *.constants.js   # Fixed lists (categories, account types)
 │           ├── *.repository.js  # Raw parameterized SQL queries
@@ -721,6 +722,15 @@ erDiagram
 |---|---|---|
 | `GET` | `/reports` | Monthly expense report |
 | `GET` | `/transactions` | Combined transaction history |
+
+## Profile
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/profile` | View profile & account stats |
+| `POST` | `/profile` | Update name/email |
+| `POST` | `/profile/password` | Change password |
+| `POST` | `/profile/delete` | Permanently delete account & all data |
 
 ---
 

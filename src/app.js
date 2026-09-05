@@ -15,6 +15,7 @@ const budgetsRoutes = require('./modules/budgets/budgets.routes');
 const loansRoutes = require('./modules/loans/loans.routes');
 const reportsRoutes = require('./modules/reports/reports.routes');
 const transactionsRoutes = require('./modules/transactions/transactions.routes');
+const profileRoutes = require('./modules/profile/profile.routes');
 
 function createApp() {
     const app = express();
@@ -56,6 +57,7 @@ function createApp() {
     protectedRouter.use(loansRoutes);
     protectedRouter.use(reportsRoutes);
     protectedRouter.use(transactionsRoutes);
+    protectedRouter.use(profileRoutes);
 
     app.use('/', protectedRouter);
 
