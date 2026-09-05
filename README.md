@@ -146,7 +146,18 @@ Ledger follows a **modular, layered architecture** — each feature (accounts, e
 ```text
 ledger-expense-tracker/
 │
+├── 📂 .github/
+│   └── workflows/
+│       └── ci.yml               # Lint + real-Postgres tests on every push/PR
+│
 ├── 📄 server.js                 # Thin entrypoint: init DB, start listening
+│
+├── 📂 scripts/
+│   └── check-syntax.js          # `npm run lint` — parses every .js file
+│
+├── 📂 test/
+│   ├── dates.test.js            # Unit tests (month-range edge cases)
+│   └── integration.test.js      # Full-stack tests against real PostgreSQL
 │
 ├── 📂 src/
 │   ├── 📄 app.js                # Express app factory (middleware + route mounting)
@@ -784,6 +795,46 @@ npm run dev
 ```
 
 The project uses Node's built-in watch mode, so the server automatically restarts when server-side files change.
+
+## Running tests locally
+
+The test suite runs against a real PostgreSQL database (no mocks) using Node's built-in test runner — no extra test framework to install.
+
+```bash
+# Point at any throwaway Postgres database
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ledger_test
+
+npm run lint   # parses every .js file, fails fast on syntax errors
+npm test       # runs test/*.test.js — unit tests + full integration tests
+```
+
+`npm test` creates its own tables via the same `initSchema()` the app uses on boot, registers real users, and exercises accounts, credit-limit spend/repay/overpay capping, EMI accounts, transfers, imports, budgets, loans, and the reports date-range logic end-to-end. It's safe to point at a disposable local database — each run uses uniquely-generated emails so it won't collide with itself.
+
+---
+
+# 🤖 Continuous Integration
+
+Every push and every pull request targeting `main` automatically runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml), which:
+
+1. Spins up a real, throwaway PostgreSQL 16 service container (not a mock).
+2. Installs dependencies with `npm ci` on Node 20.x **and** 22.x.
+3. Runs `npm run lint` — a syntax pass over every source file.
+4. Runs `npm test` — the full test suite described above.
+5. Confirms the Express app boots cleanly.
+
+If any step fails, the check shows up red on the commit/PR — anyone can see at a glance whether a contributor's change is safe to merge, without pulling the branch down and running it manually.
+
+### Requiring this check before merging
+
+The workflow alone only *reports* status — to actually **block merging** until it passes, a repository owner needs to turn on branch protection once:
+
+1. On GitHub: **Settings → Branches → Add branch protection rule**.
+2. Branch name pattern: `main` (or `master`, whichever is the default).
+3. Enable **"Require status checks to pass before merging"**.
+4. Search for and select the `Lint & test (Node 20.x)` and `Lint & test (Node 22.x)` checks (they'll appear in the list after the workflow has run at least once).
+5. Optionally also enable **"Require branches to be up to date before merging"** so PRs are always tested against the latest `main`.
+
+After that, GitHub disables the merge button on any pull request — from a contributor or the owner — until CI is green.
 
 ---
 

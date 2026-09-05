@@ -1,5 +1,6 @@
 const express = require('express');
 const { money } = require('../../core/money');
+const { getMonthRange } = require('../../core/dates');
 const expensesService = require('../expenses/expenses.service');
 
 const router = express.Router();
@@ -11,14 +12,7 @@ router.get('/reports', async (req, res, next) => {
 
         const categories = await expensesService.getCategoryBreakdown(userId, month);
         const total = await expensesService.getMonthTotal(userId, month);
-
-        const [y, m] = month.split('-').map(Number);
-        const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-
-        const expenses = await expensesService.getAllExpenses(userId, {
-            from: `${month}-01`,
-            to: `${month}-${String(lastDay).padStart(2, '0')}`
-        });
+        const expenses = await expensesService.getAllExpenses(userId, getMonthRange(month));
 
         res.render('reports', {
             pageTitle: 'Reports',

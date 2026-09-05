@@ -1,0 +1,76 @@
+name: CI
+
+# Runs on every push (any branch, including a contributor's fork branch
+# once opened as a PR) and on every pull request targeting main. This
+# is the check that "Require status checks to pass before merging"
+# (set up once in Settings → Branches) will block merging on.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main, master]
+
+# If someone pushes again before the previous run finishes, cancel the
+# stale run instead of wasting minutes on an outdated commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint & test (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20.x, 22.x]
+
+    # A real, throwaway Postgres for this run only — the same database
+    # engine the app runs on in production, not a mock.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ledger_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ledger_test
+      SESSION_SECRET: ci-test-secret
+      NODE_ENV: test
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check every source file
+        run: npm run lint
+
+      - name: Run test suite against PostgreSQL
+        run: npm test
+
+      - name: Verify the app boots cleanly
+        run: |
+          node -e "
+            const { createApp } = require('./src/app');
+            const app = createApp();
+            console.log('App factory OK —', app._router.stack.length, 'top-level layers');
+          "
