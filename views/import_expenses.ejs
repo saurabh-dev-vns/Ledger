@@ -1,0 +1,73 @@
+<%- include('partials/header') %>
+
+<div class="page-head">
+    <p class="eyebrow">History</p>
+    <h1>Import past expenses</h1>
+    <p class="sub">
+        Bring in spending from before you started using Ledger. These are
+        saved as historical records only — no account balance changes.
+    </p>
+</div>
+
+<div class="grid-2">
+
+    <div class="card">
+        <h2>Paste your data</h2>
+
+        <form method="POST" action="/import-expenses" class="form">
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="<%= csrfToken %>"
+            >
+
+            <label>
+                One entry per line
+                <span class="optional">date, amount, note (note is optional)</span>
+                <textarea
+                    name="data"
+                    rows="12"
+                    required
+                    placeholder="2026-01-01, 250
+2026-01-02, 180, Auto fare
+05-01-2026, 620
+06/01/2026 340 Groceries"
+                ></textarea>
+            </label>
+
+            <button class="btn btn-primary btn-block">
+                Import records
+            </button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Format</h2>
+
+        <ul class="hint-list">
+            <li>One day's spending per line.</li>
+            <li>Separate the date and amount with a comma or a space.</li>
+            <li>Dates can be <code>YYYY-MM-DD</code> or <code>DD-MM-YYYY</code> (also with <code>/</code>).</li>
+            <li>An optional third value is saved as a note.</li>
+            <li>Blank lines are ignored.</li>
+        </ul>
+
+        <p class="hint">
+            Imported entries are tagged
+            <strong>“Imported (Historical)”</strong>
+            and show up in your Expenses list, Reports, and monthly trend —
+            but they never touch a Cash, Online, or any other account
+            balance, since the money was already spent before Ledger
+            existed for you.
+        </p>
+
+        <p class="hint">
+            If anything in your paste can't be read, nothing is imported —
+            you'll get a list of the exact lines to fix, then you can
+            paste again.
+        </p>
+    </div>
+
+</div>
+
+<%- include('partials/footer') %>

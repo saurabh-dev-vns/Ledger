@@ -1,21 +1,11 @@
-const { Pool } = require('pg');
+const pool = require('./pool');
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not set. Create a PostgreSQL database and set DATABASE_URL in your environment.');
-}
-
-const isProduction = process.env.NODE_ENV === 'production';
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
-  max: Number(process.env.DB_POOL_MAX || 10),
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-});
-
-pool.on('error', err => console.error('Unexpected PostgreSQL pool error:', err));
-
-async function initDb() {
+/**
+ * Creates every table fresh, and migrates existing databases forward
+ * (ADD COLUMN IF NOT EXISTS / DROP+ADD CONSTRAINT) so this is safe to
+ * run on every boot, on a brand-new database or an existing one.
+ */
+async function initSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
@@ -45,11 +35,22 @@ async function initDb() {
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      type TEXT NOT NULL CHECK (type IN ('cash','online','bank','credit','other')),
+      type TEXT NOT NULL CHECK (type IN ('cash','online','bank','credit','emi','other')),
       balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+      credit_limit NUMERIC(12,2),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(user_id, name)
     );
+
+    ALTER TABLE accounts ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12,2);
+
+    ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_type_check;
+    ALTER TABLE accounts ADD CONSTRAINT accounts_type_check
+      CHECK (type IN ('cash','online','bank','credit','emi','other'));
+
+    ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_balance_within_limit;
+    ALTER TABLE accounts ADD CONSTRAINT accounts_balance_within_limit
+      CHECK (credit_limit IS NULL OR balance <= credit_limit);
 
     CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
 
@@ -143,4 +144,4 @@ async function initDb() {
   console.log('PostgreSQL database initialized.');
 }
 
-module.exports = { pool, initDb };
+module.exports = { initSchema };

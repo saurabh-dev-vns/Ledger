@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: ledger
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: saurabh
+      POSTGRES_PASSWORD: python...
+      POSTGRES_DB: ledger
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

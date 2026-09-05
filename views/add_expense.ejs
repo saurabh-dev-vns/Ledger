@@ -47,7 +47,12 @@
                     <select name="account_id" required>
                         <% accounts.forEach(a=>{ %>
                             <option value="<%= a.id %>">
-                                <%= a.name %> — ₹<%= money(a.balance) %>
+                                <%= a.name %> —
+                                <% if (isCreditType(a.type) && a.credit_limit !== null) { %>
+                                    ₹<%= money(a.balance) %> available of ₹<%= money(a.credit_limit) %>
+                                <% } else { %>
+                                    ₹<%= money(a.balance) %>
+                                <% } %>
                             </option>
                         <% }) %>
                     </select>
@@ -94,7 +99,13 @@
             <% accounts.forEach(a=>{ %>
                 <div class="account-item">
                     <span><%= a.name %></span>
-                    <strong>₹<%= money(a.balance) %></strong>
+                    <strong>
+                        <% if (isCreditType(a.type) && a.credit_limit !== null) { %>
+                            ₹<%= money(a.balance) %> avail.
+                        <% } else { %>
+                            ₹<%= money(a.balance) %>
+                        <% } %>
+                    </strong>
                 </div>
             <% }) %>
         </div>

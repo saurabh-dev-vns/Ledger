@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { pool } = require('../db/init');
+const pool = require('../db/pool');
 
 async function findSessionUser(req) {
   if (!req.session.userId) return null;
