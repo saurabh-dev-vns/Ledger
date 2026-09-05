@@ -180,6 +180,45 @@
         <% }) } %>
     </div>
 
+    <!-- Credit & EMI -->
+    <% if (creditAccounts.length) { %>
+        <div class="card">
+            <div class="card-head">
+                <h2>Credit &amp; EMI</h2>
+                <a href="/accounts" class="link-more">Manage →</a>
+            </div>
+
+            <div class="account-list">
+                <% creditAccounts.forEach(a => {
+                    const used = a.credit_limit !== null ? a.credit_limit - a.balance : 0;
+                    const pct = a.credit_limit ? Math.min(100, Math.round(used / a.credit_limit * 100)) : 0;
+                %>
+                    <div class="budget-mini">
+                        <div class="bar-item-head">
+                            <span><%= a.name %> <small>(<%= accountTypeLabel(a.type) %>)</small></span>
+                            <span>
+                                ₹<%= money(used) %> / ₹<%= money(a.credit_limit) %>
+                            </span>
+                        </div>
+
+                        <div class="bar-track">
+                            <div
+                                class="bar-fill <%= pct >= 90 ? 'over' : '' %>"
+                                style="width:<%= pct %>%"
+                            ></div>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+
+            <p class="hint">
+                Shows how much of each limit is used. This isn't counted
+                in "Total across accounts" since it's borrowed, not cash
+                you have.
+            </p>
+        </div>
+    <% } %>
+
     <!-- Money Owed -->
     <div class="card">
         <div class="card-head">

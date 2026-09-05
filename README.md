@@ -97,80 +97,127 @@ Passwords are **never stored as plain text**.
 
 ```mermaid
 flowchart TD
-    A[🌐 Browser] --> B[Express Server]
+    A[🌐 Browser] --> B[Express App]
 
-    B --> C[Authentication Routes]
-    B --> D[Application Routes]
+    B --> C[Auth Module Routes]
+    B --> D[Feature Module Routes]
 
-    C --> E[Auth Middleware]
+    C --> E[Session Middleware]
     D --> E
 
-    E --> F[Wallet / Business Logic]
+    E --> F1[Accounts Service]
+    E --> F2[Expenses Service]
+    E --> F3[Transfers Service]
+    E --> F4[Budgets Service]
+    E --> F5[Loans Service]
+    E --> F6[Imports Service]
+    E --> F7[Dashboard / Reports / Transactions]
 
-    F --> G[(PostgreSQL)]
+    F7 --> F1
+    F7 --> F2
+    F7 --> F3
+    F7 --> F4
+    F7 --> F5
 
-    G --> H[Users]
-    G --> I[Accounts]
-    G --> J[Expenses]
-    G --> K[Transfers]
-    G --> L[Budgets]
-    G --> M[Loans]
-    G --> N[Balance Logs]
+    F1 --> G1[Accounts Repository]
+    F2 --> G2[Expenses Repository]
+    F3 --> G3[Transfers Repository]
+    F4 --> G4[Budgets Repository]
+    F5 --> G5[Loans Repository]
 
-    F --> O[EJS Views]
+    G1 --> H[(PostgreSQL)]
+    G2 --> H
+    G3 --> H
+    G4 --> H
+    G5 --> H
+
+    D --> O[EJS Views]
     O --> A
 ```
+
+Each feature module (`src/modules/<name>/`) is layered **routes → service → repository**, so a change to one feature's SQL or validation never touches another module's files.
 
 ---
 
 ## 📁 Project Structure
 
+Ledger follows a **modular, layered architecture** — each feature (accounts, expenses, budgets, etc.) is a self-contained module with its own repository (raw SQL), service (business logic/validation), and routes (HTTP layer). This keeps features independent and easy to find, change, or hand off to a collaborator without touching unrelated code.
+
 ```text
 ledger-expense-tracker/
 │
-├── 📂 db/
-│   └── init.js                 # PostgreSQL connection & schema initialization
+├── 📂 .github/
+│   └── workflows/
+│       └── ci.yml               # Lint + real-Postgres tests on every push/PR
 │
-├── 📂 middleware/
-│   └── auth.js                 # Authentication, sessions & CSRF
+├── 📄 server.js                 # Thin entrypoint: init DB, start listening
+│
+├── 📂 scripts/
+│   └── check-syntax.js          # `npm run lint` — parses every .js file
+│
+├── 📂 test/
+│   ├── dates.test.js            # Unit tests (month-range edge cases)
+│   └── integration.test.js      # Full-stack tests against real PostgreSQL
+│
+├── 📂 src/
+│   ├── 📄 app.js                # Express app factory (middleware + route mounting)
+│   │
+│   ├── 📂 config/
+│   │   └── env.js               # Centralized environment variable handling
+│   │
+│   ├── 📂 db/
+│   │   ├── pool.js              # PostgreSQL connection pool
+│   │   ├── schema.js            # Table creation & migrations
+│   │   └── index.js
+│   │
+│   ├── 📂 core/
+│   │   ├── money.js             # money()/round2()/formatDate() helpers
+│   │   └── transaction.js       # runInTransaction() BEGIN/COMMIT/ROLLBACK wrapper
+│   │
+│   ├── 📂 middleware/
+│   │   └── session.js           # requireLogin, flash messages, CSRF
+│   │
+│   └── 📂 modules/
+│       ├── auth/                # Register, login, logout
+│       ├── accounts/            # Cash/Bank/Credit Card/EMI accounts
+│       ├── expenses/            # Add/list/delete expenses
+│       ├── imports/             # Bulk-import historical spending
+│       ├── transfers/           # Move money between accounts
+│       ├── budgets/             # Monthly category budgets
+│       ├── loans/               # Money owed / owed to you
+│       ├── dashboard/           # Aggregates other modules for the home page
+│       ├── reports/             # Monthly category reports
+│       └── transactions/        # Combined expense + transfer feed
+│           │
+│           ├── *.constants.js   # Fixed lists (categories, account types)
+│           ├── *.repository.js  # Raw parameterized SQL queries
+│           ├── *.service.js     # Validation + business rules + transactions
+│           └── *.routes.js      # Express routes, calls the service layer
 │
 ├── 📂 public/
 │   └── css/
-│       └── style.css           # Application styling
+│       └── style.css
 │
-├── 📂 routes/
-│   ├── app.js                  # Main application routes
-│   └── auth.js                 # Login, registration & logout
-│
-├── 📂 utils/
-│   └── wallet.js               # Account, expense, budget & loan logic
-│
-├── 📂 views/
+├── 📂 views/                    # EJS templates (unchanged — see below)
 │   ├── dashboard.ejs
 │   ├── accounts.ejs
-│   ├── add_balance.ejs
-│   ├── add_expense.ejs
-│   ├── budgets.ejs
-│   ├── expenses.ejs
-│   ├── loans.ejs
-│   ├── reports.ejs
-│   ├── transactions.ejs
-│   ├── swap_balance.ejs
-│   ├── login.ejs
-│   ├── register.ejs
-│   ├── 404.ejs
-│   │
+│   ├── ...
 │   └── 📂 partials/
-│       ├── header.ejs
-│       └── footer.ejs
 │
-├── 📄 server.js
 ├── 📄 package.json
 ├── 📄 package-lock.json
 ├── 📄 .env.example
 ├── 📄 .gitignore
 └── 📄 README.md
 ```
+
+### Why this layout
+
+- **`repository`** files never contain business logic — just SQL, parameterized, one query per exported function.
+- **`service`** files own validation and any multi-table logic (e.g. `expenses.service.js` debits an account *and* inserts the expense row inside one DB transaction).
+- **`routes`** files stay thin: parse the request, call one service function, flash a message, redirect/render.
+- Cross-feature composition (like the dashboard, which needs accounts + expenses + budgets + loans all at once) lives in its own module that calls the other modules' *services* — never their repositories directly, so each module's storage details stay private to itself.
+- `views/` and `public/` are untouched by this refactor — no template changes were needed since the render `locals` stayed identical.
 
 ---
 
@@ -333,9 +380,12 @@ Ledger supports multiple account types:
 💵 Cash
 🌐 Online
 🏦 Bank
-💳 Credit
+💳 Credit Card
+📅 EMI / Installment
 📦 Other
 ```
+
+Credit Card and EMI accounts work differently from the rest: instead of a plain top-up balance, you set a **credit limit**. The account starts fully available, spending reduces the available amount, and repaying restores it — capped at the limit, just like a real card.
 
 Every account has its own balance.
 
@@ -746,6 +796,46 @@ npm run dev
 
 The project uses Node's built-in watch mode, so the server automatically restarts when server-side files change.
 
+## Running tests locally
+
+The test suite runs against a real PostgreSQL database (no mocks) using Node's built-in test runner — no extra test framework to install.
+
+```bash
+# Point at any throwaway Postgres database
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ledger_test
+
+npm run lint   # parses every .js file, fails fast on syntax errors
+npm test       # runs test/*.test.js — unit tests + full integration tests
+```
+
+`npm test` creates its own tables via the same `initSchema()` the app uses on boot, registers real users, and exercises accounts, credit-limit spend/repay/overpay capping, EMI accounts, transfers, imports, budgets, loans, and the reports date-range logic end-to-end. It's safe to point at a disposable local database — each run uses uniquely-generated emails so it won't collide with itself.
+
+---
+
+# 🤖 Continuous Integration
+
+Every push and every pull request targeting `main` automatically runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml), which:
+
+1. Spins up a real, throwaway PostgreSQL 16 service container (not a mock).
+2. Installs dependencies with `npm ci` on Node 20.x **and** 22.x.
+3. Runs `npm run lint` — a syntax pass over every source file.
+4. Runs `npm test` — the full test suite described above.
+5. Confirms the Express app boots cleanly.
+
+If any step fails, the check shows up red on the commit/PR — anyone can see at a glance whether a contributor's change is safe to merge, without pulling the branch down and running it manually.
+
+### Requiring this check before merging
+
+The workflow alone only *reports* status — to actually **block merging** until it passes, a repository owner needs to turn on branch protection once:
+
+1. On GitHub: **Settings → Branches → Add branch protection rule**.
+2. Branch name pattern: `main` (or `master`, whichever is the default).
+3. Enable **"Require status checks to pass before merging"**.
+4. Search for and select the `Lint & test (Node 20.x)` and `Lint & test (Node 22.x)` checks (they'll appear in the list after the workflow has run at least once).
+5. Optionally also enable **"Require branches to be up to date before merging"** so PRs are always tested against the latest `main`.
+
+After that, GitHub disables the merge button on any pull request — from a contributor or the owner — until CI is green.
+
 ---
 
 # 🔧 Useful Development Commands
@@ -860,7 +950,7 @@ The application automatically initializes the PostgreSQL schema when it starts.
 Database initialization is handled by:
 
 ```text
-db/init.js
+src/db/schema.js
 ```
 
 At startup, the application:
@@ -868,7 +958,7 @@ At startup, the application:
 1. Connects to PostgreSQL
 2. Creates required tables if they don't exist
 3. Creates indexes
-4. Adds required account columns
+4. Adds required account columns (including `credit_limit` for Credit Card/EMI accounts)
 5. Creates default Cash and Online accounts
 6. Migrates legacy wallet balances into accounts
 7. Links older expenses to accounts
@@ -947,6 +1037,17 @@ Some possible additions for future versions:
 # 🤝 Contributing
 
 Contributions are welcome.
+
+### Adding a new feature module
+
+Thanks to the modular layout, most new features don't touch existing code at all:
+
+1. Create `src/modules/<feature>/` with `<feature>.repository.js` (SQL), `<feature>.service.js` (validation/logic), and `<feature>.routes.js` (Express routes).
+2. Add any new tables to `src/db/schema.js` (it's safe to run repeatedly — use `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
+3. Mount the router in `src/app.js` — one line, inside `protectedRouter` if it needs login.
+4. Add a view under `views/` if it renders a page.
+
+If your feature needs data from another module (e.g. a report that needs both expenses and budgets), import that module's **service**, never its repository — that keeps each module's SQL private to itself.
 
 ### 1. Fork the repository
 

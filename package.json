@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "lint": "node scripts/check-syntax.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

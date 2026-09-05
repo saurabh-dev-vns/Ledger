@@ -31,40 +31,14 @@
             <select name="method">
                 <option value="">All</option>
 
-                <option
-                    value="cash"
-                    <%=filters.method==='cash'?'selected':''%>
-                >
-                    Cash
-                </option>
-
-                <option
-                    value="online"
-                    <%=filters.method==='online'?'selected':''%>
-                >
-                    Online
-                </option>
-
-                <option
-                    value="bank"
-                    <%=filters.method==='bank'?'selected':''%>
-                >
-                    Bank
-                </option>
-
-                <option
-                    value="credit"
-                    <%=filters.method==='credit'?'selected':''%>
-                >
-                    Credit
-                </option>
-
-                <option
-                    value="other"
-                    <%=filters.method==='other'?'selected':''%>
-                >
-                    Other
-                </option>
+                <% accountTypes.forEach(t=>{ %>
+                    <option
+                        value="<%= t %>"
+                        <%= filters.method === t ? 'selected' : '' %>
+                    >
+                        <%= accountTypeLabel(t) %>
+                    </option>
+                <% }) %>
             </select>
         </label>
 
@@ -120,48 +94,52 @@
 
                 <tbody>
                     <%expenses.forEach(row=>{ %>
-                        <tr>
-                            <td class="col-date">
-                                <%=formatDate(row.spent_on)%>
-                            </td>
+                    <% const isImported = !row.account_name && row.payment_method === 'imported'; %>
+                    <% const confirmMsg = isImported
+                        ? 'Delete this imported record? No account balance will change.'
+                        : 'Delete this expense? The amount will be credited back.'; %>
+                    <tr>
+                        <td class="col-date">
+                            <%=formatDate(row.spent_on)%>
+                        </td>
 
-                            <td>
-                                <span class="cat-tag">
-                                    <%=row.category%>
-                                </span>
-                            </td>
+                        <td>
+                            <span class="cat-tag">
+                                <%=row.category%>
+                            </span>
+                        </td>
 
-                            <td class="row-note">
-                                <%=row.notes||'—'%>
-                            </td>
+                        <td class="row-note">
+                            <%=row.notes||'—'%>
+                        </td>
 
-                            <td class="col-method">
-                                <%=row.account_name||row.payment_method%>
-                            </td>
+                        <td class="col-method">
+                            <%= row.account_name || (isImported ? 'Imported (no account)' : row.payment_method) %>
+                        </td>
 
-                            <td class="col-amount">
-                                ₹<%=money(row.amount)%>
-                            </td>
+                        <td class="col-amount">
+                            ₹<%=money(row.amount)%>
+                        </td>
 
-                            <td class="col-action">
-                                <form
-                                    method="POST"
-                                    action="/expenses/<%=row.id%>/delete"
-                                    onsubmit="return confirm('Delete this expense? The amount will be credited back.');"
+                        <td class="col-action">
+                            <form
+                                method="POST"
+                                action="/expenses/<%=row.id%>/delete"
+                                onsubmit="return confirm('<%= confirmMsg %>');"
+                            >
+                                <input
+                                    type="hidden"
+                                    name="csrf_token"
+                                    value="<%=csrfToken%>"
                                 >
-                                    <input
-                                        type="hidden"
-                                        name="csrf_token"
-                                        value="<%=csrfToken%>"
-                                    >
 
-                                    <button class="btn-link-danger">
-                                        Delete
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    <%})%>
+                                <button class="btn-link-danger">
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                <%})%>
                 </tbody>
             </table>
         </div>

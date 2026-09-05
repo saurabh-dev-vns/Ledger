@@ -4,7 +4,7 @@
     <p class="eyebrow">Money</p>
     <h1>Accounts</h1>
     <p class="sub">
-        Keep cash, UPI, bank accounts, cards and other balances separate.
+        Keep cash, UPI, bank accounts, cards and EMIs separate.
     </p>
 </div>
 
@@ -13,7 +13,7 @@
     <div class="card">
         <h2>Add account</h2>
 
-        <form method="POST" action="/accounts" class="form">
+        <form method="POST" action="/accounts" class="form" id="add-account-form">
             <input
                 type="hidden"
                 name="csrf_token"
@@ -31,16 +31,16 @@
 
             <label>
                 Type
-                <select name="type">
+                <select name="type" id="account-type">
                     <% accountTypes.forEach(t=>{ %>
                         <option value="<%= t %>">
-                            <%= t[0].toUpperCase()+t.slice(1) %>
+                            <%= accountTypeLabel(t) %>
                         </option>
                     <% }) %>
                 </select>
             </label>
 
-            <label>
+            <label id="opening-balance-field">
                 Opening balance
                 <input
                     type="number"
@@ -51,10 +51,42 @@
                 >
             </label>
 
+            <label id="credit-limit-field" style="display:none">
+                Credit limit (₹)
+                <span class="optional">the card/EMI's total limit</span>
+                <input
+                    type="number"
+                    name="credit_limit"
+                    step="0.01"
+                    min="0.01"
+                    placeholder="e.g. 10000"
+                >
+            </label>
+
             <button class="btn btn-primary btn-block">
                 Create account
             </button>
         </form>
+
+        <script>
+            (() => {
+                const typeSelect = document.getElementById('account-type');
+                const balanceField = document.getElementById('opening-balance-field');
+                const limitField = document.getElementById('credit-limit-field');
+                const limitInput = limitField.querySelector('input');
+                const creditTypes = ['credit', 'emi'];
+
+                const sync = () => {
+                    const isCredit = creditTypes.includes(typeSelect.value);
+                    balanceField.style.display = isCredit ? 'none' : '';
+                    limitField.style.display = isCredit ? '' : 'none';
+                    limitInput.required = isCredit;
+                };
+
+                typeSelect.addEventListener('change', sync);
+                sync();
+            })();
+        </script>
     </div>
 
     <div class="card">
@@ -62,13 +94,28 @@
 
         <div class="account-list">
             <% accounts.forEach(a=>{ %>
+                <% const credit = isCreditType(a.type) && a.credit_limit !== null; %>
+                <% const used = credit ? a.credit_limit - a.balance : 0; %>
+
                 <div class="account-item">
                     <div>
                         <strong><%= a.name %></strong>
-                        <small><%= a.type %></small>
+                        <small><%= accountTypeLabel(a.type) %></small>
+
+                        <% if (credit) { %>
+                            <small>
+                                Used ₹<%= money(used) %> of ₹<%= money(a.credit_limit) %> limit
+                            </small>
+                        <% } %>
                     </div>
 
-                    <strong>₹<%= money(a.balance) %></strong>
+                    <strong>
+                        <% if (credit) { %>
+                            ₹<%= money(a.balance) %> available
+                        <% } else { %>
+                            ₹<%= money(a.balance) %>
+                        <% } %>
+                    </strong>
 
                     <form
                         method="POST"
@@ -86,17 +133,23 @@
                             name="amount"
                             step="0.01"
                             min="0.01"
-                            placeholder="Add ₹"
+                            placeholder="<%= credit ? 'Repay ₹' : 'Add ₹' %>"
                             required
                         >
 
                         <button class="btn btn-secondary">
-                            Add
+                            <%= credit ? 'Repay' : 'Add' %>
                         </button>
                     </form>
                 </div>
             <% }) %>
         </div>
+
+        <p class="hint">
+            For Credit Card and EMI accounts, spending reduces the
+            available amount and repaying restores it — capped at the
+            card's limit — instead of changing real cash.
+        </p>
     </div>
 
 </div>
