@@ -7,7 +7,7 @@ const { test, before } = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.DATABASE_URL = process.env.DATABASE_URL
-    || 'postgresql://saurabh:python...@localhost:5432/ledger';
+    || 'postgresql://postgres:postgres@localhost:5432/ledger_test';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
 const { initSchema } = require('../src/db/schema');
@@ -207,4 +207,265 @@ test('transaction feed combines expenses and transfers', async () => {
     const feed = await transactionsService.getTransactionFeed(user.id, {});
     assert.ok(feed.some(f => f.kind === 'expense'), 'feed should include at least one expense');
     assert.ok(feed.some(f => f.kind === 'transfer'), 'feed should include at least one transfer');
+});
+
+test('profile: update name and email', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const newEmail = `updated-${Date.now()}@example.com`;
+
+    const updated = await profileService.updateProfile(user.id, 'Updated Name', newEmail);
+    assert.equal(updated.name, 'Updated Name');
+    assert.equal(updated.email, newEmail);
+
+    const profile = await profileService.getProfile(user.id);
+    assert.equal(profile.name, 'Updated Name');
+    assert.equal(profile.email, newEmail);
+
+    // Restore for subsequent tests that reference userEmail
+    await profileService.updateProfile(user.id, 'Test User', userEmail);
+});
+
+test('profile: cannot change email to one already used by another account', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const otherEmail = `other-${Date.now()}@example.com`;
+    await authService.register({ name: 'Other', email: otherEmail, password: 'password1', confirm: 'password1' });
+
+    await assert.rejects(
+        () => profileService.updateProfile(user.id, 'Test User', otherEmail),
+        /already in use/
+    );
+});
+
+test('profile: stats reflect accounts, expenses, and loans created in earlier tests', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const profile = await profileService.getProfile(user.id);
+
+    assert.ok(profile.stats.accountCount >= 2, 'should include at least the default Cash/Online accounts');
+    assert.ok(profile.stats.expenseCount > 0, 'should include expenses created in earlier tests');
+    assert.ok(profile.stats.totalSpent > 0);
+});
+
+test('profile: changing password requires the correct current password', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+
+    await assert.rejects(
+        () => profileService.changePassword(user.id, 'wrong-current-password', 'newpassword1', 'newpassword1'),
+        /incorrect/i
+    );
+
+    await assert.doesNotReject(
+        () => profileService.changePassword(user.id, 'password1', 'newpassword1', 'newpassword1')
+    );
+
+    // Old password should no longer work; new one should.
+    const oldStillWorks = await authService.login(userEmail, 'password1');
+    assert.equal(oldStillWorks, null);
+
+    const newWorks = await authService.login(userEmail, 'newpassword1');
+    assert.ok(newWorks);
+
+    // Restore original password so later tests (if any) aren't affected.
+    await profileService.changePassword(user.id, 'newpassword1', 'password1', 'password1');
+});
+
+test('profile: deleting the account removes the user and all owned data', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const pool = require('../src/db/pool');
+
+    const email = `delete-me-${Date.now()}@example.com`;
+    const victim = await authService.register({ name: 'Delete Me', email, password: 'password1', confirm: 'password1' });
+
+    const ccId = await accountsService.addAccount(victim.id, 'Card', 'credit', 0, 5000);
+    await expensesService.addExpense(victim.id, 100, 'test', 'credit', 'Shopping', '2026-01-01', ccId);
+    await loansService.addLoan(victim.id, 'Someone', 'owed_to_me', 500, null);
+
+    await assert.rejects(
+        () => profileService.deleteAccount(victim.id, 'wrong-password'),
+        /incorrect/i
+    );
+
+    await profileService.deleteAccount(victim.id, 'password1');
+
+    const userRow = await pool.query('SELECT id FROM users WHERE id = $1', [victim.id]);
+    assert.equal(userRow.rowCount, 0, 'user row should be gone');
+
+    const accountRows = await pool.query('SELECT id FROM accounts WHERE user_id = $1', [victim.id]);
+    assert.equal(accountRows.rowCount, 0, 'accounts should cascade-delete');
+
+    const expenseRows = await pool.query('SELECT id FROM expenses WHERE user_id = $1', [victim.id]);
+    assert.equal(expenseRows.rowCount, 0, 'expenses should cascade-delete');
+
+    const loanRows = await pool.query('SELECT id FROM loans WHERE user_id = $1', [victim.id]);
+    assert.equal(loanRows.rowCount, 0, 'loans should cascade-delete');
+});
+
+// --- Password reset (forgot password / OTP) ---
+// Intercept the mailer so tests can capture the generated OTP without
+// needing real network access to Resend — this exercises everything
+// except the actual HTTP call to their API, which needs a real key.
+const mailerPath = require.resolve('../src/modules/password-reset/password-reset.mailer');
+let lastSentOtp = null;
+let lastSentTo = null;
+let mailerCallCount = 0;
+require.cache[mailerPath] = {
+    id: mailerPath,
+    filename: mailerPath,
+    loaded: true,
+    exports: {
+        sendOtpEmail: async (toEmail, toName, otp) => {
+            lastSentOtp = otp;
+            lastSentTo = toEmail;
+            mailerCallCount++;
+        }
+    }
+};
+
+const passwordResetService = require('../src/modules/password-reset/password-reset.service');
+
+test('forgot-password: requesting a reset for an unknown email does nothing observable (no enumeration)', async () => {
+    mailerCallCount = 0;
+    await assert.doesNotReject(() => passwordResetService.requestReset('no-such-user@example.com'));
+    assert.equal(mailerCallCount, 0, 'mailer should not be called for an unknown email');
+});
+
+test('forgot-password: requesting a reset for a real email sends a 6-digit OTP', async () => {
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+
+    assert.equal(lastSentTo, userEmail);
+    assert.match(lastSentOtp, /^\d{6}$/);
+});
+
+test('forgot-password: correct OTP resets the password; old password stops working, new one works', async () => {
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    const otp = lastSentOtp;
+
+    await passwordResetService.verifyAndReset(userEmail, otp, 'brandnewpass1', 'brandnewpass1');
+
+    const oldWorks = await authService.login(userEmail, 'password1');
+    assert.equal(oldWorks, null, 'old password should no longer work');
+
+    const newWorks = await authService.login(userEmail, 'brandnewpass1');
+    assert.ok(newWorks, 'new password should work');
+
+    // Restore original password for any tests that might run after this file.
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    await passwordResetService.verifyAndReset(userEmail, lastSentOtp, 'password1', 'password1');
+});
+
+test('forgot-password: an OTP cannot be reused after a successful reset', async () => {
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    const otp = lastSentOtp;
+
+    await passwordResetService.verifyAndReset(userEmail, otp, 'anotherpass1', 'anotherpass1');
+
+    await assert.rejects(
+        () => passwordResetService.verifyAndReset(userEmail, otp, 'yetanotherpass1', 'yetanotherpass1'),
+        /invalid or has expired/
+    );
+
+    // Restore original password.
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    await passwordResetService.verifyAndReset(userEmail, lastSentOtp, 'password1', 'password1');
+});
+
+test('forgot-password: requesting a new code invalidates the previous one', async () => {
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    const firstOtp = lastSentOtp;
+
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    const secondOtp = lastSentOtp;
+
+    await assert.rejects(
+        () => passwordResetService.verifyAndReset(userEmail, firstOtp, 'somepassword1', 'somepassword1'),
+        /invalid or has expired/
+    );
+
+    await assert.doesNotReject(
+        () => passwordResetService.verifyAndReset(userEmail, secondOtp, 'somepassword1', 'somepassword1')
+    );
+
+    // Restore original password.
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    await passwordResetService.verifyAndReset(userEmail, lastSentOtp, 'password1', 'password1');
+});
+
+test('forgot-password: wrong OTP is rejected without resetting the password', async () => {
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+
+    await assert.rejects(
+        () => passwordResetService.verifyAndReset(userEmail, '000000', 'somepassword1', 'somepassword1'),
+        /invalid or has expired/
+    );
+
+    const stillWorks = await authService.login(userEmail, 'password1');
+    assert.ok(stillWorks, 'password should be unchanged after a failed OTP attempt');
+});
+
+test('forgot-password: too many wrong attempts locks out the code, even if the correct one is used afterward', async () => {
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    const correctOtp = lastSentOtp;
+
+    for (let i = 0; i < 5; i++) {
+        await assert.rejects(() => passwordResetService.verifyAndReset(userEmail, '000000', 'x123456', 'x123456'));
+    }
+
+    await assert.rejects(
+        () => passwordResetService.verifyAndReset(userEmail, correctOtp, 'x123456', 'x123456'),
+        /too many/i
+    );
+
+    const stillWorks = await authService.login(userEmail, 'password1');
+    assert.ok(stillWorks, 'password should be unchanged after lockout');
+});
+
+test('forgot-password: an expired OTP is rejected', async () => {
+    const pool = require('../src/db/pool');
+
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    const otp = lastSentOtp;
+
+    // Force it into the past instead of waiting 10 real minutes.
+    await pool.query(
+        `UPDATE password_resets
+         SET expires_at = NOW() - INTERVAL '1 minute'
+         WHERE user_id = (SELECT id FROM users WHERE email = $1)
+         AND used = FALSE`,
+        [userEmail]
+    );
+
+    await assert.rejects(
+        () => passwordResetService.verifyAndReset(userEmail, otp, 'somepassword1', 'somepassword1'),
+        /invalid or has expired/
+    );
+
+    const stillWorks = await authService.login(userEmail, 'password1');
+    assert.ok(stillWorks, 'password should be unchanged after an expired OTP attempt');
+});
+
+test('forgot-password: rejects a malformed OTP without touching the database', async () => {
+    await assert.rejects(
+        () => passwordResetService.verifyAndReset(userEmail, 'abc', 'somepassword1', 'somepassword1'),
+        /invalid or has expired/
+    );
+});
+
+test('forgot-password: rejects mismatched new passwords', async () => {
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+
+    await assert.rejects(
+        () => passwordResetService.verifyAndReset(userEmail, lastSentOtp, 'passwordA1', 'passwordB1'),
+        /do not match/
+    );
 });

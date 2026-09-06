@@ -43,7 +43,7 @@
       <a href="/transactions" class="<%= pageTitle === 'Transactions' ? 'active' : '' %>">Transactions</a>
       <a href="/reports" class="<%= pageTitle === 'Reports' ? 'active' : '' %>">Reports</a>
       <div class="topbar-user">
-        <span class="topbar-username"><%= currentUser.name %></span>
+        <a href="/profile" class="topbar-username <%= pageTitle === 'Profile' ? 'active' : '' %>"><%= currentUser.name %></a>
         <form method="POST" action="/logout">
           <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
           <button type="submit" class="logout-link">Sign out</button>

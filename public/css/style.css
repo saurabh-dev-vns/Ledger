@@ -222,6 +222,13 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  text-decoration: none;
+}
+
+.topbar-username:hover,
+.topbar-username.active {
+  text-decoration: underline;
 }
 
 .topbar-user form {
@@ -879,6 +886,32 @@ textarea:focus {
   width: 100%;
 }
 
+.btn-danger {
+  background: var(--rust);
+
+  color: var(--paper-raised);
+
+  border-color: var(--rust);
+}
+
+.btn-danger:hover {
+  background: #963f2c;
+}
+
+.danger-zone {
+  border: 1px solid var(--rust);
+
+  background: var(--rust-soft);
+
+  border-radius: 12px;
+
+  padding: 20px;
+}
+
+.danger-zone h2 {
+  color: var(--rust);
+}
+
 
 /* ============================================================
    Auth pages
@@ -935,6 +968,51 @@ textarea:focus {
   font-weight: 600;
 
   text-decoration: none;
+}
+
+.auth-forgot {
+  text-align: right;
+
+  font-size: 13px;
+
+  margin: -8px 0 0;
+}
+
+.auth-forgot a {
+  color: var(--ink-soft);
+
+  text-decoration: none;
+}
+
+.auth-forgot a:hover {
+  color: var(--ink);
+
+  text-decoration: underline;
+}
+
+.auth-resend {
+  text-align: center;
+
+  margin-top: 16px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+
+  font-family: var(--font-body);
+  font-size: 13px;
+
+  color: var(--ink-soft);
+
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: var(--green);
+
+  text-decoration: underline;
 }
 
 

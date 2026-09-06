@@ -6,6 +6,7 @@ const env = require('./config/env');
 const { locals, requireLogin } = require('./middleware/session');
 
 const authRoutes = require('./modules/auth/auth.routes');
+const passwordResetRoutes = require('./modules/password-reset/password-reset.routes');
 const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const accountsRoutes = require('./modules/accounts/accounts.routes');
 const expensesRoutes = require('./modules/expenses/expenses.routes');
@@ -15,6 +16,7 @@ const budgetsRoutes = require('./modules/budgets/budgets.routes');
 const loansRoutes = require('./modules/loans/loans.routes');
 const reportsRoutes = require('./modules/reports/reports.routes');
 const transactionsRoutes = require('./modules/transactions/transactions.routes');
+const profileRoutes = require('./modules/profile/profile.routes');
 
 function createApp() {
     const app = express();
@@ -41,8 +43,9 @@ function createApp() {
         res.redirect(req.session.userId ? '/dashboard' : '/login');
     });
 
-    // Public: registration/login/logout manage their own redirects.
+    // Public: registration/login/logout/password-reset manage their own redirects.
     app.use('/', authRoutes);
+    app.use('/', passwordResetRoutes);
 
     // Everything below requires a signed-in user.
     const protectedRouter = express.Router();
@@ -56,6 +59,7 @@ function createApp() {
     protectedRouter.use(loansRoutes);
     protectedRouter.use(reportsRoutes);
     protectedRouter.use(transactionsRoutes);
+    protectedRouter.use(profileRoutes);
 
     app.use('/', protectedRouter);
 

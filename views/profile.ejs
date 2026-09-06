@@ -1,0 +1,120 @@
+<%- include('partials/header') %>
+
+<div class="page-head">
+    <p class="eyebrow">Account</p>
+    <h1>Profile</h1>
+    <p class="sub">Manage your name, email, password, and account.</p>
+</div>
+
+<div class="grid-2">
+
+    <div class="card">
+        <h2>Your details</h2>
+
+        <p class="hint" style="margin-top:0">
+            Member since <%= formatDate(profile.createdAt) %>
+        </p>
+
+        <form method="POST" action="/profile" class="form">
+            <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+
+            <label>
+                Name
+                <input name="name" value="<%= profile.name %>" required>
+            </label>
+
+            <label>
+                Email
+                <input type="email" name="email" value="<%= profile.email %>" required>
+            </label>
+
+            <button class="btn btn-primary btn-block">
+                Save changes
+            </button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>At a glance</h2>
+
+        <div class="account-list">
+            <div class="account-item">
+                <span>Accounts</span>
+                <strong><%= profile.stats.accountCount %></strong>
+            </div>
+
+            <div class="account-item">
+                <span>Expenses recorded</span>
+                <strong><%= profile.stats.expenseCount %></strong>
+            </div>
+
+            <div class="account-item">
+                <span>Total spent (all time)</span>
+                <strong>₹<%= money(profile.stats.totalSpent) %></strong>
+            </div>
+
+            <div class="account-item">
+                <span>Loans tracked</span>
+                <strong><%= profile.stats.loanCount %></strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Change password</h2>
+
+        <form method="POST" action="/profile/password" class="form">
+            <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+
+            <label>
+                Current password
+                <input type="password" name="current_password" required autocomplete="current-password">
+            </label>
+
+            <label>
+                New password
+                <input type="password" name="new_password" required minlength="6" autocomplete="new-password">
+            </label>
+
+            <label>
+                Confirm new password
+                <input type="password" name="confirm_password" required minlength="6" autocomplete="new-password">
+            </label>
+
+            <button class="btn btn-primary btn-block">
+                Update password
+            </button>
+        </form>
+    </div>
+
+    <div class="danger-zone">
+        <h2>Delete account</h2>
+
+        <p class="hint" style="margin-top:0">
+            This permanently deletes your account and every account,
+            expense, transfer, budget, and loan attached to it. This
+            cannot be undone.
+        </p>
+
+        <form
+            method="POST"
+            action="/profile/delete"
+            class="form"
+            onsubmit="return confirm('This will permanently delete your account and all your data. This cannot be undone. Continue?');"
+        >
+            <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+
+            <label>
+                Enter your password to confirm
+                <input type="password" name="password" required autocomplete="current-password">
+            </label>
+
+            <button class="btn btn-danger btn-block">
+                Permanently delete my account
+            </button>
+        </form>
+    </div>
+
+</div>
+
+<%- include('partials/footer') %>
