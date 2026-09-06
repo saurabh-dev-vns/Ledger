@@ -188,7 +188,8 @@ ledger-expense-tracker/
 │       ├── dashboard/           # Aggregates other modules for the home page
 │       ├── reports/             # Monthly category reports
 │       ├── transactions/        # Combined expense + transfer feed
-│       └── profile/             # View/edit name, email, password; delete account
+│       ├── profile/             # View/edit name, email, password; delete account
+│       └── password-reset/      # Forgot-password OTP flow (via Resend)
 │           │
 │           ├── *.constants.js   # Fixed lists (categories, account types)
 │           ├── *.repository.js  # Raw parameterized SQL queries
@@ -731,6 +732,41 @@ erDiagram
 | `POST` | `/profile` | Update name/email |
 | `POST` | `/profile/password` | Change password |
 | `POST` | `/profile/delete` | Permanently delete account & all data |
+
+## Forgot password
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/forgot-password` | Enter your email to request a reset code |
+| `POST` | `/forgot-password` | Sends a 6-digit OTP by email (via Resend) |
+| `GET` | `/reset-password` | Enter the code + new password |
+| `POST` | `/reset-password` | Verifies the code and sets the new password |
+
+---
+
+# 🔑 Forgot Password (OTP via Resend)
+
+If someone forgets their password, they can request a 6-digit one-time code by email instead of contacting support:
+
+1. **`/forgot-password`** — enter the account's email.
+2. A 6-digit OTP is generated, hashed with bcrypt, and stored with a 10-minute expiry. Any earlier unused code for that user is invalidated first, so only the most recent code can ever work.
+3. The OTP is emailed via [Resend](https://resend.com)'s API.
+4. **`/reset-password`** — enter the code along with a new password.
+5. On success the code is immediately burned (can't be reused), and the password is updated.
+
+**Security details:**
+- The response to `/forgot-password` is identical whether or not the email exists, so this endpoint can't be used to check which emails are registered.
+- Wrong codes are limited to 5 attempts; after that, the code is locked out (even the correct code stops working) and a new one must be requested.
+- Codes expire after 10 minutes.
+- OTPs are stored as bcrypt hashes, never in plaintext.
+
+### Setting up Resend
+
+1. Create a free account at [resend.com](https://resend.com) and grab an API key.
+2. Set `RESEND_API_KEY` in your `.env`.
+3. Set `RESEND_FROM_EMAIL` — Resend's shared `onboarding@resend.dev` sender works for testing without any domain setup; verify your own domain in Resend for production use.
+
+**In development, if `RESEND_API_KEY` is left unset, the OTP is printed to the server console instead of emailed** — so the whole flow can be tested locally without a Resend account. In production, a missing key raises a clear error the moment someone requests a reset (not at server boot, so installs that don't use this feature aren't forced to configure it).
 
 ---
 

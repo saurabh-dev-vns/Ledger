@@ -100,4 +100,19 @@ async function deleteAccount(userId, password) {
     return runInTransaction(client => repo.deleteUser(userId, client));
 }
 
-module.exports = { getProfile, updateProfile, changePassword, deleteAccount };
+/**
+ * Sets a new password without checking the current one — used only
+ * by the forgot-password flow, after the caller has already verified
+ * a valid OTP. Never expose this directly to a route without an OTP
+ * (or equivalent) check happening first.
+ */
+async function resetPasswordDirectly(userId, newPassword) {
+    if (!newPassword || newPassword.length < 6) {
+        throw new Error('New password must be at least 6 characters.');
+    }
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await repo.updatePasswordHash(userId, hash);
+}
+
+module.exports = { getProfile, updateProfile, changePassword, deleteAccount, resetPasswordDirectly };

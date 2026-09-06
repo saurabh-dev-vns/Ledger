@@ -20,5 +20,14 @@ module.exports = {
   port: Number(process.env.PORT || 3000),
   databaseUrl: process.env.DATABASE_URL,
   dbPoolMax: Number(process.env.DB_POOL_MAX || 10),
-  sessionSecret: process.env.SESSION_SECRET || 'dev-secret-change-me'
+  sessionSecret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+
+  // Used to email OTP codes for "forgot password". Optional in
+  // development — if unset, the OTP is logged to the console instead
+  // of emailed, so the flow can still be tested locally. Required in
+  // production (checked lazily, only when someone actually requests a
+  // reset, so installs that don't use this feature aren't forced to
+  // configure it).
+  resendApiKey: process.env.RESEND_API_KEY || null,
+  resendFromEmail: process.env.RESEND_FROM_EMAIL || 'Ledger <onboarding@resend.dev>'
 };

@@ -53,4 +53,10 @@ async function login(email, password) {
     return null;
 }
 
-module.exports = { register, login };
+/** Public-safe lookup for other modules (e.g. password reset) — never exposes password_hash. */
+async function findByEmail(email) {
+    const user = await repo.findByEmail(email);
+    return user ? { id: user.id, name: user.name, email: user.email } : null;
+}
+
+module.exports = { register, login, findByEmail };

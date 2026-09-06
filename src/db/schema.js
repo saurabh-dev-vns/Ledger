@@ -106,11 +106,22 @@ async function initSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      otp_hash TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      attempts INT NOT NULL DEFAULT 0,
+      used BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, spent_on);
     CREATE INDEX IF NOT EXISTS idx_balance_log_user_date ON balance_log(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_wallet_transfers_user_date ON wallet_transfers(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_budgets_user_month ON budgets(user_id, month);
     CREATE INDEX IF NOT EXISTS idx_loans_user ON loans(user_id);
+    CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
 
     INSERT INTO accounts(user_id, name, type, balance)
     SELECT u.id, 'Cash', 'cash', COALESCE(w.cash_balance, 0)
