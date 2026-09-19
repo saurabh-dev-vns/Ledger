@@ -1,4 +1,5 @@
 const env = require('../../config/env');
+const logger = require('../../core/logger');
 
 /**
  * Sends the OTP email via Resend's REST API (https://resend.com/docs/api-reference/emails/send-email).
@@ -16,7 +17,7 @@ async function sendOtpEmail(toEmail, toName, otp) {
             throw new Error('Password reset emails are not configured. Set RESEND_API_KEY.');
         }
 
-        console.log(`\n[dev] RESEND_API_KEY not set — password reset OTP for ${toEmail}: ${otp}\n`);
+        logger.warn({ toEmail, otp }, 'RESEND_API_KEY not set — logging OTP instead of emailing it (development only)');
         return;
     }
 
@@ -46,7 +47,7 @@ async function sendOtpEmail(toEmail, toName, otp) {
 
     if (!response.ok) {
         const body = await response.text().catch(() => '');
-        console.error('Resend API error:', response.status, body);
+        logger.error({ status: response.status, body }, 'Resend API error sending OTP email');
         throw new Error('Could not send the reset email. Please try again shortly.');
     }
 }

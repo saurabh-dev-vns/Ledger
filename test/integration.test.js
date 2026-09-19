@@ -268,7 +268,7 @@ test('profile: changing password requires the correct current password', async (
     await profileService.changePassword(user.id, 'newpassword1', 'password1', 'password1');
 });
 
-test('profile: deleting the account removes the user and all owned data', async () => {
+test('profile: deleting the account soft-deletes it — data stays intact but login is blocked', async () => {
     const profileService = require('../src/modules/profile/profile.service');
     const pool = require('../src/db/pool');
 
@@ -286,17 +286,113 @@ test('profile: deleting the account removes the user and all owned data', async 
 
     await profileService.deleteAccount(victim.id, 'password1');
 
-    const userRow = await pool.query('SELECT id FROM users WHERE id = $1', [victim.id]);
-    assert.equal(userRow.rowCount, 0, 'user row should be gone');
+    const userRow = await pool.query('SELECT id, deleted_at FROM users WHERE id = $1', [victim.id]);
+    assert.equal(userRow.rowCount, 1, 'user row should still exist (soft-deleted, not gone)');
+    assert.ok(userRow.rows[0].deleted_at, 'deleted_at should be set');
 
+    // Data must NOT be touched yet — it's only removed on final purge.
     const accountRows = await pool.query('SELECT id FROM accounts WHERE user_id = $1', [victim.id]);
-    assert.equal(accountRows.rowCount, 0, 'accounts should cascade-delete');
+    assert.ok(accountRows.rowCount > 0, 'accounts should still exist during the restore window');
 
     const expenseRows = await pool.query('SELECT id FROM expenses WHERE user_id = $1', [victim.id]);
-    assert.equal(expenseRows.rowCount, 0, 'expenses should cascade-delete');
+    assert.ok(expenseRows.rowCount > 0, 'expenses should still exist during the restore window');
 
     const loanRows = await pool.query('SELECT id FROM loans WHERE user_id = $1', [victim.id]);
-    assert.equal(loanRows.rowCount, 0, 'loans should cascade-delete');
+    assert.ok(loanRows.rowCount > 0, 'loans should still exist during the restore window');
+
+    // Logging in with correct credentials returns a pendingRestore
+    // signal instead of a normal successful login.
+    const loginResult = await authService.login(email, 'password1');
+    assert.ok(loginResult, 'correct credentials should still be recognized');
+    assert.equal(loginResult.pendingRestore, true);
+    assert.ok(loginResult.purgeAt instanceof Date);
+});
+
+test('profile: restoring a soft-deleted account brings it fully back', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const pool = require('../src/db/pool');
+
+    const email = `restore-me-${Date.now()}@example.com`;
+    const victim = await authService.register({ name: 'Restore Me', email, password: 'password1', confirm: 'password1' });
+    const cashId = (await accountsService.getAccounts(victim.id)).find(a => a.name === 'Cash').id;
+    await accountsService.updateAccountBalance(victim.id, cashId, 1000, 'seed funds');
+    await expensesService.addExpense(
+        victim.id, 250, 'pre-delete expense', 'cash', 'Food & Dining', '2026-01-05', cashId
+    );
+
+    await profileService.deleteAccount(victim.id, 'password1');
+
+    let loginResult = await authService.login(email, 'password1');
+    assert.equal(loginResult.pendingRestore, true);
+
+    await profileService.restoreAccount(victim.id);
+
+    const userRow = await pool.query('SELECT deleted_at FROM users WHERE id = $1', [victim.id]);
+    assert.equal(userRow.rows[0].deleted_at, null, 'deleted_at should be cleared');
+
+    loginResult = await authService.login(email, 'password1');
+    assert.ok(loginResult && !loginResult.pendingRestore, 'login should work normally after restore');
+
+    // Data survived the whole round trip.
+    const expenses = await expensesService.getRecentExpenses(victim.id, 10);
+    assert.ok(expenses.some(e => e.notes === 'pre-delete expense'), 'expenses from before deletion should still be there');
+});
+
+test('profile: a soft-deleted account past its restore window can no longer log in or be restored via login', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const pool = require('../src/db/pool');
+
+    const email = `expired-delete-${Date.now()}@example.com`;
+    const victim = await authService.register({ name: 'Expired', email, password: 'password1', confirm: 'password1' });
+
+    await profileService.deleteAccount(victim.id, 'password1');
+
+    // Force it to look like it was deleted 31 days ago instead of waiting for real time to pass.
+    await pool.query(
+        `UPDATE users SET deleted_at = NOW() - INTERVAL '31 days' WHERE id = $1`,
+        [victim.id]
+    );
+
+    const loginResult = await authService.login(email, 'password1');
+    assert.equal(loginResult, null, 'login should fail once the restore window has passed, even with correct credentials');
+});
+
+test('purge job permanently removes accounts past their restore window, and leaves recent ones alone', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const pool = require('../src/db/pool');
+
+    const oldEmail = `purge-old-${Date.now()}@example.com`;
+    const oldUser = await authService.register({ name: 'Old Deleted', email: oldEmail, password: 'password1', confirm: 'password1' });
+    await profileService.deleteAccount(oldUser.id, 'password1');
+    await pool.query(`UPDATE users SET deleted_at = NOW() - INTERVAL '31 days' WHERE id = $1`, [oldUser.id]);
+
+    const recentEmail = `purge-recent-${Date.now()}@example.com`;
+    const recentUser = await authService.register({ name: 'Recently Deleted', email: recentEmail, password: 'password1', confirm: 'password1' });
+    await profileService.deleteAccount(recentUser.id, 'password1');
+    // deleted just now — well within the 30-day window, should survive the purge
+
+    const purgedCount = await profileService.purgeExpiredDeletedAccounts();
+    assert.ok(purgedCount >= 1, 'should have purged at least the 31-day-old account');
+
+    const oldRow = await pool.query('SELECT id FROM users WHERE id = $1', [oldUser.id]);
+    assert.equal(oldRow.rowCount, 0, 'account past the restore window should be permanently gone');
+
+    const recentRow = await pool.query('SELECT id, deleted_at FROM users WHERE id = $1', [recentUser.id]);
+    assert.equal(recentRow.rowCount, 1, 'recently-deleted account should NOT be purged yet');
+    assert.ok(recentRow.rows[0].deleted_at, 'it should still be marked as soft-deleted');
+});
+
+test("registering with a soft-deleted account's email is blocked during the restore window", async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+
+    const email = `reclaim-${Date.now()}@example.com`;
+    const original = await authService.register({ name: 'Original', email, password: 'password1', confirm: 'password1' });
+    await profileService.deleteAccount(original.id, 'password1');
+
+    await assert.rejects(
+        () => authService.register({ name: 'New Person', email, password: 'password1', confirm: 'password1' }),
+        /already exists/
+    );
 });
 
 // --- Password reset (forgot password / OTP) ---
@@ -468,4 +564,111 @@ test('forgot-password: rejects mismatched new passwords', async () => {
         () => passwordResetService.verifyAndReset(userEmail, lastSentOtp, 'passwordA1', 'passwordB1'),
         /do not match/
     );
+});
+
+// --- Audit trail ---
+test('audit: registration and successful login are recorded', async () => {
+    const auditService = require('../src/modules/audit/audit.service');
+
+    const email = `audit-${Date.now()}@example.com`;
+    const newUser = await authService.register({ name: 'Audit Test', email, password: 'password1', confirm: 'password1' });
+
+    await authService.login(email, 'password1');
+
+    const activity = await auditService.getRecentActivity(newUser.id, 10);
+    const actions = activity.map(a => a.action);
+
+    assert.ok(actions.includes('registered'), 'registration should be recorded');
+    assert.ok(actions.includes('login_success'), 'successful login should be recorded');
+});
+
+test('audit: failed login attempts are recorded against the right user', async () => {
+    const auditService = require('../src/modules/audit/audit.service');
+
+    const email = `audit-fail-${Date.now()}@example.com`;
+    const newUser = await authService.register({ name: 'Audit Fail', email, password: 'password1', confirm: 'password1' });
+
+    const result = await authService.login(email, 'wrong-password');
+    assert.equal(result, null);
+
+    const activity = await auditService.getRecentActivity(newUser.id, 10);
+    assert.ok(activity.some(a => a.action === 'login_failed'), 'failed login should be recorded');
+});
+
+test('audit: login against an unknown email is not recorded anywhere (nothing to attach it to)', async () => {
+    const pool = require('../src/db/pool');
+
+    await authService.login('totally-unknown-email@example.com', 'whatever');
+
+    const rows = await pool.query(
+        `SELECT id FROM audit_logs WHERE details LIKE '%totally-unknown-email%'`
+    );
+    assert.equal(rows.rowCount, 0);
+});
+
+test('audit: profile updates, password changes, delete, and restore are all recorded', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const auditService = require('../src/modules/audit/audit.service');
+
+    const email = `audit-lifecycle-${Date.now()}@example.com`;
+    const newUser = await authService.register({ name: 'Lifecycle', email, password: 'password1', confirm: 'password1' });
+
+    await profileService.updateProfile(newUser.id, 'New Name', email);
+    await profileService.changePassword(newUser.id, 'password1', 'newpassword1', 'newpassword1');
+    await profileService.deleteAccount(newUser.id, 'newpassword1');
+    await profileService.restoreAccount(newUser.id);
+
+    const activity = await auditService.getRecentActivity(newUser.id, 20);
+    const actions = activity.map(a => a.action);
+
+    assert.ok(actions.includes('profile_updated'));
+    assert.ok(actions.includes('password_changed'));
+    assert.ok(actions.includes('account_deleted'));
+    assert.ok(actions.includes('account_restored'));
+});
+
+test('audit: password reset request and completion are recorded', async () => {
+    const auditService = require('../src/modules/audit/audit.service');
+
+    // Reuse the mailer interception already set up above for the
+    // password-reset tests in this file.
+    lastSentOtp = null;
+    await passwordResetService.requestReset(userEmail);
+    const otp = lastSentOtp;
+
+    await passwordResetService.verifyAndReset(userEmail, otp, 'temppass123', 'temppass123');
+
+    const userRow = await require('../src/db/pool').query('SELECT id FROM users WHERE email = $1', [userEmail]);
+    const activity = await auditService.getRecentActivity(userRow.rows[0].id, 20);
+    const actions = activity.map(a => a.action);
+
+    assert.ok(actions.includes('password_reset_requested'));
+    assert.ok(actions.includes('password_reset_completed'));
+
+    // Restore original password for anything after this in the file.
+    await passwordResetService.requestReset(userEmail);
+    await passwordResetService.verifyAndReset(userEmail, lastSentOtp, 'password1', 'password1');
+});
+
+test('audit log entries are removed when the account is permanently purged', async () => {
+    const profileService = require('../src/modules/profile/profile.service');
+    const pool = require('../src/db/pool');
+
+    const email = `audit-purge-${Date.now()}@example.com`;
+    const victim = await authService.register({ name: 'Audit Purge', email, password: 'password1', confirm: 'password1' });
+    await profileService.deleteAccount(victim.id, 'password1');
+    await pool.query(`UPDATE users SET deleted_at = NOW() - INTERVAL '31 days' WHERE id = $1`, [victim.id]);
+
+    await profileService.purgeExpiredDeletedAccounts();
+
+    const rows = await pool.query('SELECT id FROM audit_logs WHERE user_id = $1', [victim.id]);
+    assert.equal(rows.rowCount, 0, 'audit log entries should cascade-delete with the user');
+});
+
+test('a failure writing an audit log entry does not break the underlying operation', async () => {
+    const auditService = require('../src/modules/audit/audit.service');
+
+    // A non-existent user_id violates the audit_logs FK — this should
+    // be swallowed and logged internally, never thrown.
+    await assert.doesNotReject(() => auditService.log(999999999, 'registered'));
 });

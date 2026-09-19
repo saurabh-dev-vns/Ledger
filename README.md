@@ -1,1154 +1,364 @@
-# 💰 Ledger — Expense Tracker
+# 💰 Ledger - Personal Expense Tracker
 
-> A simple, secure, and responsive personal expense tracker built with **Node.js, Express, EJS, and PostgreSQL**.
+> Track your money. Understand your spending. Stay in control.
 
-Ledger helps you keep track of your **expenses, accounts, cash/online balances, transfers, budgets, loans, and spending reports** — all from one dashboard.
-
----
-
-## ✨ Features
-
-### 💸 Expense Management
-- Add expenses
-- Choose an account/payment source
-- Categorize spending
-- Add notes
-- Select custom expense dates
-- Delete expenses
-- Automatically restore deleted expense amounts
-
-### 🏦 Account Management
-- Create multiple accounts
-- Cash account
-- Online account
-- Bank accounts
-- Credit accounts
-- Other accounts
-- Add balance to any account
-- Automatic balance updates
-
-### 🔄 Money Transfers
-- Transfer money between accounts
-- Cash → Online
-- Online → Cash
-- Bank → Cash
-- Account → Account
-- Prevent transfers when balance is insufficient
-- Transaction history
-
-### 📊 Dashboard & Reports
-- Total available balance
-- Monthly spending
-- Recent expenses
-- Recent transfers
-- Category breakdown
-- Monthly spending trends
-- Monthly reports
-
-### 🎯 Budgets
-- Create monthly category budgets
-- Track budget spending
-- Compare budget vs actual spending
-- Update existing budgets
-- Delete budgets
-
-### 🤝 Loans / Money Owed
-- Track money owed to you
-- Track money you owe others
-- Record repayments
-- Track remaining amount
-- Add notes to loans
+Ledger is a personal finance app built with **Node.js, Express, PostgreSQL, and Redis**. It runs entirely in your browser - no app store, no subscription, no data sent to third parties.
 
 ---
 
-## 🔐 Security
+## ✨ What Can It Do?
 
-Ledger includes several security features:
-
-- 🔒 Password hashing using `bcryptjs`
-- 🍪 Secure cookie-based sessions
-- 🛡️ CSRF token protection for POST requests
-- 🔑 Protected authenticated routes
-- 🗄️ Parameterized PostgreSQL queries
-- 👤 User-specific data isolation
-- 🔐 Production session configuration
-
-Passwords are **never stored as plain text**.
-
----
-
-## 🧰 Tech Stack
-
-| Technology | Purpose |
+| Feature | What you get |
 |---|---|
-| 🟢 Node.js | Backend runtime |
-| 🚂 Express.js | Web server & routing |
-| 🎨 EJS | Server-side HTML rendering |
-| 🐘 PostgreSQL | Database |
-| 🔐 bcryptjs | Password hashing |
-| 🍪 cookie-session | Authentication sessions |
-| 📦 dotenv | Environment configuration |
-| 🐘 pg | PostgreSQL driver |
-| 🎨 CSS | Responsive frontend styling |
+| 💸 **Expenses** | Log spending by category, account, date, and notes |
+| 🏦 **Accounts** | Cash, Online, Bank, Credit Card, EMI, and more |
+| 🔄 **Transfers** | Move money between accounts with balance validation |
+| 🎯 **Budgets** | Set monthly limits per category, track progress |
+| 🤝 **Loans** | Track who owes you (and who you owe) |
+| 📊 **Dashboard** | Live totals, recent activity, spending trends |
+| 📈 **Reports** | Monthly category breakdown with totals |
+| 📜 **Transactions** | Unified feed of expenses + transfers |
+| 👤 **Profile** | Edit name/email, change password, delete account |
+| 🔑 **Forgot Password** | 6-digit OTP sent to your email via Resend |
 
 ---
 
-## 🏗️ Architecture
+## 🚀 Quick Start
 
-```mermaid
-flowchart TD
-    A[🌐 Browser] --> B[Express App]
+### 1. Prerequisites
 
-    B --> C[Auth Module Routes]
-    B --> D[Feature Module Routes]
+You need these installed and running:
 
-    C --> E[Session Middleware]
-    D --> E
-
-    E --> F1[Accounts Service]
-    E --> F2[Expenses Service]
-    E --> F3[Transfers Service]
-    E --> F4[Budgets Service]
-    E --> F5[Loans Service]
-    E --> F6[Imports Service]
-    E --> F7[Dashboard / Reports / Transactions]
-
-    F7 --> F1
-    F7 --> F2
-    F7 --> F3
-    F7 --> F4
-    F7 --> F5
-
-    F1 --> G1[Accounts Repository]
-    F2 --> G2[Expenses Repository]
-    F3 --> G3[Transfers Repository]
-    F4 --> G4[Budgets Repository]
-    F5 --> G5[Loans Repository]
-
-    G1 --> H[(PostgreSQL)]
-    G2 --> H
-    G3 --> H
-    G4 --> H
-    G5 --> H
-
-    D --> O[EJS Views]
-    O --> A
-```
-
-Each feature module (`src/modules/<name>/`) is layered **routes → service → repository**, so a change to one feature's SQL or validation never touches another module's files.
-
----
-
-## 📁 Project Structure
-
-Ledger follows a **modular, layered architecture** — each feature (accounts, expenses, budgets, etc.) is a self-contained module with its own repository (raw SQL), service (business logic/validation), and routes (HTTP layer). This keeps features independent and easy to find, change, or hand off to a collaborator without touching unrelated code.
-
-```text
-ledger-expense-tracker/
-│
-├── 📂 .github/
-│   └── workflows/
-│       └── ci.yml               # Lint + real-Postgres tests on every push/PR
-│
-├── 📄 server.js                 # Thin entrypoint: init DB, start listening
-│
-├── 📂 scripts/
-│   └── check-syntax.js          # `npm run lint` — parses every .js file
-│
-├── 📂 test/
-│   ├── dates.test.js            # Unit tests (month-range edge cases)
-│   └── integration.test.js      # Full-stack tests against real PostgreSQL
-│
-├── 📂 src/
-│   ├── 📄 app.js                # Express app factory (middleware + route mounting)
-│   │
-│   ├── 📂 config/
-│   │   └── env.js               # Centralized environment variable handling
-│   │
-│   ├── 📂 db/
-│   │   ├── pool.js              # PostgreSQL connection pool
-│   │   ├── schema.js            # Table creation & migrations
-│   │   └── index.js
-│   │
-│   ├── 📂 core/
-│   │   ├── money.js             # money()/round2()/formatDate() helpers
-│   │   └── transaction.js       # runInTransaction() BEGIN/COMMIT/ROLLBACK wrapper
-│   │
-│   ├── 📂 middleware/
-│   │   └── session.js           # requireLogin, flash messages, CSRF
-│   │
-│   └── 📂 modules/
-│       ├── auth/                # Register, login, logout
-│       ├── accounts/            # Cash/Bank/Credit Card/EMI accounts
-│       ├── expenses/            # Add/list/delete expenses
-│       ├── imports/             # Bulk-import historical spending
-│       ├── transfers/           # Move money between accounts
-│       ├── budgets/             # Monthly category budgets
-│       ├── loans/               # Money owed / owed to you
-│       ├── dashboard/           # Aggregates other modules for the home page
-│       ├── reports/             # Monthly category reports
-│       ├── transactions/        # Combined expense + transfer feed
-│       ├── profile/             # View/edit name, email, password; delete account
-│       └── password-reset/      # Forgot-password OTP flow (via Resend)
-│           │
-│           ├── *.constants.js   # Fixed lists (categories, account types)
-│           ├── *.repository.js  # Raw parameterized SQL queries
-│           ├── *.service.js     # Validation + business rules + transactions
-│           └── *.routes.js      # Express routes, calls the service layer
-│
-├── 📂 public/
-│   └── css/
-│       └── style.css
-│
-├── 📂 views/                    # EJS templates (unchanged — see below)
-│   ├── dashboard.ejs
-│   ├── accounts.ejs
-│   ├── ...
-│   └── 📂 partials/
-│
-├── 📄 package.json
-├── 📄 package-lock.json
-├── 📄 .env.example
-├── 📄 .gitignore
-└── 📄 README.md
-```
-
-### Why this layout
-
-- **`repository`** files never contain business logic — just SQL, parameterized, one query per exported function.
-- **`service`** files own validation and any multi-table logic (e.g. `expenses.service.js` debits an account *and* inserts the expense row inside one DB transaction).
-- **`routes`** files stay thin: parse the request, call one service function, flash a message, redirect/render.
-- Cross-feature composition (like the dashboard, which needs accounts + expenses + budgets + loans all at once) lives in its own module that calls the other modules' *services* — never their repositories directly, so each module's storage details stay private to itself.
-- `views/` and `public/` are untouched by this refactor — no template changes were needed since the render `locals` stayed identical.
-
----
-
-# 🚀 Getting Started
-
-## 1️⃣ Prerequisites
-
-Make sure you have:
-
-- **Node.js** installed
-- **npm** installed
-- **PostgreSQL** installed and running
-- A PostgreSQL database created for Ledger
-
-Check your installations:
+- [Node.js](https://nodejs.org) (v20 or later)
+- [PostgreSQL](https://www.postgresql.org)
+- [Redis](https://redis.io) - or run it via Docker: `docker run -d -p 6379:6379 redis`
 
 ```bash
-node --version
-npm --version
+node --version   # v20+
 psql --version
+redis-cli ping   # should reply PONG
 ```
 
 ---
 
-## 2️⃣ Clone the Repository
+### 2. Clone & Install
 
 ```bash
-git clone https://github.com/saurabh-dev-vns/expense-tracker-node/
+git clone https://github.com/saurabh-dev-vns/Ledger.git
 cd expense-tracker-node
-```
-
-
----
-
-## 3️⃣ Install Dependencies
-
-```bash
 npm install
 ```
 
 ---
 
-# 🐘 PostgreSQL Setup
-
-Create a PostgreSQL database.
-
-For example:
+### 3. Create a PostgreSQL Database
 
 ```sql
 CREATE DATABASE ledger;
 ```
 
-You don't need to manually create the application tables.
-
-When the application starts, `db/init.js` automatically creates the required tables and indexes.
+> **Note:** You don't need to create any tables. The app creates them automatically on first boot.
 
 ---
 
-# ⚙️ Environment Variables
+### 4. Configure Environment
 
-Create a `.env` file in the project root.
+Create a `.env` file in the project root:
 
 ```env
+# PostgreSQL
 DATABASE_URL=postgresql://postgres:password@localhost:5432/ledger
 
+# Redis (for sessions)
+REDIS_URL=redis://127.0.0.1:6379
+
+# App
 PORT=3000
-
 SESSION_SECRET=change-this-to-a-long-random-string
-
 NODE_ENV=development
+
+# Email (optional in dev - OTP prints to console if unset)
+# RESEND_API_KEY=your-resend-api-key
+# RESEND_FROM_EMAIL=you@yourdomain.com
+
+# Logging
+LOG_LEVEL=info
 ```
 
-### Environment variables
-
-| Variable | Description | Example |
+| Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:password@localhost:5432/ledger` |
-| `PORT` | Server port | `3000` |
-| `SESSION_SECRET` | Secret used to sign sessions | Random long string |
-| `NODE_ENV` | Application environment | `development` / `production` |
+| `DATABASE_URL` | ✅ Always | PostgreSQL connection string |
+| `REDIS_URL` | ✅ Always | Redis connection string |
+| `SESSION_SECRET` | ✅ In production | Long random string to sign session cookies |
+| `NODE_ENV` | ✅ | `development` or `production` |
+| `PORT` | Optional | Defaults to `3000` |
+| `RESEND_API_KEY` | Optional in dev | Required in prod for password reset emails |
+| `RESEND_FROM_EMAIL` | Optional | Defaults to Resend's shared sender |
+| `LOG_LEVEL` | Optional | `trace` / `debug` / `info` / `warn` / `error` — defaults to `info` |
 
-### ⚠️ Important
-
-Never commit your real `.env` file or production secrets to GitHub.
+> ⚠️ Never commit your `.env` to Git. It's already in `.gitignore`.
 
 ---
 
-# ▶️ Running the Application
-
-## Development
+### 5. Start the App
 
 ```bash
+# Development (auto-restarts on file changes)
 npm run dev
+
+# Production
+npm start
 ```
 
-You should see something similar to:
-
-```text
-PostgreSQL database initialized.
-Ledger running at http://localhost:3000
+You should see:
+```
+INFO: PostgreSQL database initialized.
+INFO: Redis client connected
+INFO: Ledger running at http://localhost:3000
 ```
 
-Then open:
+Open **http://localhost:3000** and register your first account.
 
-```text
-http://localhost:3000
+---
+
+## 🧰 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js |
+| Web framework | Express.js |
+| Templating | EJS |
+| Database | PostgreSQL (`pg`) |
+| Session store | Redis (`connect-redis` + `express-session`) |
+| Password hashing | bcryptjs |
+| Logging | Pino + pino-http |
+| Email | Resend API |
+| Config | dotenv |
+
+---
+
+## 🔐 Security
+
+- **Passwords** are hashed with bcrypt (never stored as plain text)
+- **Sessions** are stored server-side in Redis - can be revoked instantly on logout
+- **CSRF protection** on every POST request via a per-session token
+- **Cookies** are `httpOnly`, `sameSite: lax`, and `secure` in production
+- **SQL injection** prevention via parameterized queries throughout
+- **Secrets never logged** - cookies and auth headers are redacted in all log output
+- **Data isolation** - every query is scoped to the logged-in user's ID
+
+---
+
+## 📁 Project Structure
+
+```
+ledger-expense-tracker/
+│
+├── server.js                    # Entry point: connects DB + Redis, starts server
+├── .env                         # Your local config (not committed)
+│
+├── src/
+│   ├── app.js                   # Express app (middleware + routes)
+│   ├── config/env.js            # All environment variables in one place
+│   │
+│   ├── db/
+│   │   ├── pool.js              # PostgreSQL connection pool
+│   │   ├── redis.js             # Redis client
+│   │   └── schema.js            # Auto-creates tables on startup
+│   │
+│   ├── core/
+│   │   ├── logger.js            # Pino logger (pretty in dev, JSON in prod)
+│   │   ├── money.js             # Currency formatting helpers
+│   │   ├── dates.js             # Month-range helpers for reports
+│   │   └── transaction.js       # DB transaction wrapper
+│   │
+│   ├── middleware/
+│   │   └── session.js           # requireLogin, flash messages, CSRF check
+│   │
+│   ├── jobs/
+│   │   └── purge-deleted-accounts.js  # Hourly cleanup of expired deletions
+│   │
+│   └── modules/                 # One folder per feature
+│       ├── auth/                # Register, login, logout
+│       ├── accounts/            # Account types & balances
+│       ├── expenses/            # Add, list, delete expenses
+│       ├── transfers/           # Move money between accounts
+│       ├── budgets/             # Monthly category budgets
+│       ├── loans/               # Money owed tracking
+│       ├── imports/             # Bulk-import historical expenses
+│       ├── dashboard/           # Home page aggregator
+│       ├── reports/             # Monthly spending reports
+│       ├── transactions/        # Unified expense + transfer feed
+│       ├── profile/             # Edit profile, delete account
+│       ├── password-reset/      # Forgot password OTP flow
+│       └── audit/               # "Recent activity" trail for users
+│
+├── views/                       # EJS templates
+├── public/css/                  # Stylesheet
+├── logs/                        # Log files (auto-created, not committed)
+└── test/
+    ├── dates.test.js            # Unit tests
+    └── integration.test.js      # Full-stack tests against real PostgreSQL
+```
+
+Each module follows the same 3-layer pattern:
+
+```
+*.routes.js      →  HTTP layer (parse request, call service, redirect/render)
+*.service.js     →  Business logic & validation
+*.repository.js  →  Raw SQL queries (parameterized, one function per query)
 ```
 
 ---
 
-## Production
+## 📋 Logging
 
-Set:
+Logs are written to **two places simultaneously**:
+
+| Environment | Console | File |
+|---|---|---|
+| Development | Coloured, readable (`pino-pretty`) | `logs/app.log` (JSON) |
+| Production | JSON → stdout (for Datadog/Papertrail) | `logs/app.log` (JSON) |
+
+Every HTTP request logs: method, path, status code, response time, and the **userId** of whoever made the request. Static assets (`/css/`, `/favicon`) are excluded to keep logs clean.
+
+**Tail logs in real time:**
+```bash
+# Windows
+Get-Content logs\app.log -Wait -Tail 20
+
+# Linux/macOS
+tail -f logs/app.log
+
+# Filter errors only
+Select-String '"level":50' logs\app.log     # Windows
+grep '"level":50' logs/app.log              # Linux/macOS
+```
+
+---
+
+## 🗑️ Account Deletion & Restore
+
+Deleting your account doesn't delete your data immediately:
+
+1. Account is marked deleted and you're logged out.
+2. Your data is kept for **30 days**.
+3. Log back in within 30 days → confirmation screen to restore everything.
+4. After 30 days → permanently deleted by a background job.
+
+---
+
+## 🔑 Forgot Password
+
+1. Go to `/forgot-password` and enter your email.
+2. A **6-digit code** is emailed to you (valid for 10 minutes, max 5 attempts).
+3. Go to `/reset-password`, enter the code and your new password.
+
+> In development, if `RESEND_API_KEY` is not set, the OTP is printed to the console instead of emailed - so you can test without an email account.
+
+---
+
+## 🧪 Running Tests
+
+```bash
+# Set a test database (separate from your dev database)
+$env:DATABASE_URL="postgresql://postgres:password@localhost:5432/ledger_test"
+
+npm run lint   # Syntax check all .js files
+npm test       # Unit tests + integration tests
+```
+
+Tests use Node's built-in test runner — no extra framework needed. Integration tests run against a real PostgreSQL database and clean up after themselves.
+
+---
+
+## 🌐 Deployment
+
+Set these environment variables on your host (Render, Railway, Fly.io, etc.):
 
 ```env
 NODE_ENV=production
-SESSION_SECRET=your-long-random-secret
-DATABASE_URL=your-production-postgresql-url
+DATABASE_URL=your-postgres-url
+REDIS_URL=your-redis-url
+SESSION_SECRET=a-long-random-string
+RESEND_API_KEY=your-resend-key
+RESEND_FROM_EMAIL=you@yourdomain.com
 ```
 
 Then run:
-
 ```bash
 npm start
 ```
 
----
-
-# 🧭 Application Flow
-
-```mermaid
-flowchart LR
-    A[Register] --> B[Login]
-    B --> C[Dashboard]
-
-    C --> D[Add Expense]
-    C --> E[Accounts]
-    C --> F[Transfer Money]
-    C --> G[Budgets]
-    C --> H[Loans]
-    C --> I[Reports]
-    C --> J[Transactions]
-
-    D --> K[(PostgreSQL)]
-    E --> K
-    F --> K
-    G --> K
-    H --> K
-    I --> K
-    J --> K
-```
+The app creates all database tables on startup automatically.
 
 ---
 
-# 💳 Accounts & Wallets
+## 🐛 Troubleshooting
 
-Ledger supports multiple account types:
+<details>
+<summary><strong>❌ "The client is closed" error on startup</strong></summary>
 
-```text
-💵 Cash
-🌐 Online
-🏦 Bank
-💳 Credit Card
-📅 EMI / Installment
-📦 Other
-```
-
-Credit Card and EMI accounts work differently from the rest: instead of a plain top-up balance, you set a **credit limit**. The account starts fully available, spending reduces the available amount, and repaying restores it — capped at the limit, just like a real card.
-
-Every account has its own balance.
-
-For example:
-
-```text
-Cash       ₹2,000
-Online     ₹5,000
-Bank      ₹10,000
-------------------
-Total     ₹17,000
-```
-
-The dashboard calculates the total from the user's accounts.
-
-### Default Accounts
-
-When a user account is created, Ledger automatically creates:
-
-- `Cash`
-- `Online`
-
-Additional accounts can then be added from the **Accounts** page.
-
----
-
-# 💸 Adding an Expense
-
-An expense contains:
-
-```text
-Amount
-Category
-Payment Account
-Date
-Notes
-```
-
-Example:
-
-```text
-Amount: ₹250
-Category: Food & Dining
-Account: Cash
-Date: 28/08/2026
-Notes: Lunch
-```
-
-When the expense is saved:
-
-```text
-Cash Balance
-₹2,000
-   ↓
-₹250 expense
-   ↓
-₹1,750
-```
-
-The expense and account balance are updated inside a PostgreSQL transaction.
-
----
-
-# 🔄 Transferring Money
-
-Money can be transferred between accounts.
-
-Example:
-
-```text
-Cash
-₹5,000
-   │
-   │ ₹1,000
-   ▼
-Online
-₹2,000
-```
-
-After the transfer:
-
-```text
-Cash       ₹4,000
-Online     ₹3,000
-```
-
-The total money remains unchanged.
-
-Ledger also prevents transfers when the source account doesn't have enough balance.
-
----
-
-# 🗑️ Deleting an Expense
-
-Deleting an expense does more than remove the database record.
-
-For example:
-
-```text
-Before
-
-Cash = ₹1,000
-Expense = ₹200
-```
-
-After deleting the expense:
-
-```text
-Cash = ₹1,200
-```
-
-The amount is automatically credited back to the account from which the expense was originally deducted.
-
----
-
-# 🎯 Budgets
-
-Budgets are created per category and month.
-
-Example:
-
-```text
-August 2026
-
-Food & Dining       ₹5,000
-Transport           ₹2,000
-Entertainment       ₹1,500
-Shopping            ₹3,000
-```
-
-Ledger compares:
-
-```text
-Budget
-  ↓
-Actual spending
-  ↓
-Remaining amount
-```
-
-This makes it easy to see where you're spending more than planned.
-
----
-
-# 🤝 Loans & Money Owed
-
-Ledger can track both directions of money.
-
-### Money owed to you
-
-```text
-Rahul owes you ₹2,000
-```
-
-### Money you owe
-
-```text
-You owe Amit ₹1,500
-```
-
-Repayments reduce the remaining amount.
-
-Example:
-
-```text
-Original:   ₹2,000
-Repayment:    ₹500
-----------------
-Remaining:  ₹1,500
-```
-
----
-
-# 📊 Reports
-
-The Reports page lets you select a month and see:
-
-- Total spending
-- Spending by category
-- Expenses for that month
-
-Example:
-
-```text
-August 2026
-
-Food & Dining       ₹4,250
-Transport           ₹1,800
-Shopping            ₹2,100
-Entertainment         ₹750
----------------------------
-Total               ₹8,900
-```
-
----
-
-# 📜 Transactions
-
-The Transactions page combines:
-
-- Expenses
-- Account transfers
-
-into a unified transaction feed.
-
-This gives you a chronological view of activity instead of having to check expenses and transfers separately.
-
----
-
-# 🗄️ Database Schema
-
-Ledger automatically creates the following PostgreSQL tables:
-
-```mermaid
-erDiagram
-    USERS ||--|| WALLETS : has
-    USERS ||--o{ ACCOUNTS : owns
-    USERS ||--o{ EXPENSES : records
-    USERS ||--o{ BALANCE_LOG : tracks
-    USERS ||--o{ WALLET_TRANSFERS : makes
-    USERS ||--o{ BUDGETS : creates
-    USERS ||--o{ LOANS : tracks
-
-    ACCOUNTS ||--o{ EXPENSES : pays
-    ACCOUNTS ||--o{ WALLET_TRANSFERS : source
-    ACCOUNTS ||--o{ WALLET_TRANSFERS : destination
-
-    USERS {
-        bigint id PK
-        text name
-        text email UK
-        text password_hash
-        timestamptz created_at
-    }
-
-    ACCOUNTS {
-        bigint id PK
-        bigint user_id FK
-        text name
-        text type
-        numeric balance
-        timestamptz created_at
-    }
-
-    EXPENSES {
-        bigint id PK
-        bigint user_id FK
-        numeric amount
-        text category
-        text payment_method
-        date spent_on
-        bigint account_id FK
-    }
-
-    BUDGETS {
-        bigint id PK
-        bigint user_id FK
-        text category
-        date month
-        numeric amount
-    }
-
-    LOANS {
-        bigint id PK
-        bigint user_id FK
-        text person
-        text direction
-        numeric original_amount
-        numeric remaining_amount
-    }
-```
-
----
-
-# 🛣️ Main Routes
-
-## Authentication
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/register` | Registration page |
-| `POST` | `/register` | Create account |
-| `GET` | `/login` | Login page |
-| `POST` | `/login` | Authenticate user |
-| `POST` | `/logout` | Logout |
-
-## Dashboard & Accounts
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/dashboard` | Main dashboard |
-| `GET` | `/accounts` | View accounts |
-| `POST` | `/accounts` | Create account |
-| `POST` | `/accounts/:id/add` | Add money to account |
-| `GET` | `/add-balance` | Add balance |
-| `POST` | `/add-balance` | Update balance |
-
-## Expenses
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/add-expense` | Expense form |
-| `POST` | `/add-expense` | Create expense |
-| `GET` | `/expenses` | View/filter expenses |
-| `POST` | `/expenses/:id/delete` | Delete expense |
-
-## Transfers
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/swap-balance` | Transfer form |
-| `POST` | `/swap-balance` | Transfer money |
-
-## Budgets
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/budgets` | View monthly budgets |
-| `POST` | `/budgets` | Create/update budget |
-| `POST` | `/budgets/:id/delete` | Delete budget |
-
-## Loans
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/loans` | View loans |
-| `POST` | `/loans` | Add loan |
-| `POST` | `/loans/:id/repay` | Record repayment |
-
-## Reports
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/reports` | Monthly expense report |
-| `GET` | `/transactions` | Combined transaction history |
-
-## Profile
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/profile` | View profile & account stats |
-| `POST` | `/profile` | Update name/email |
-| `POST` | `/profile/password` | Change password |
-| `POST` | `/profile/delete` | Permanently delete account & all data |
-
-## Forgot password
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/forgot-password` | Enter your email to request a reset code |
-| `POST` | `/forgot-password` | Sends a 6-digit OTP by email (via Resend) |
-| `GET` | `/reset-password` | Enter the code + new password |
-| `POST` | `/reset-password` | Verifies the code and sets the new password |
-
----
-
-# 🔑 Forgot Password (OTP via Resend)
-
-If someone forgets their password, they can request a 6-digit one-time code by email instead of contacting support:
-
-1. **`/forgot-password`** — enter the account's email.
-2. A 6-digit OTP is generated, hashed with bcrypt, and stored with a 10-minute expiry. Any earlier unused code for that user is invalidated first, so only the most recent code can ever work.
-3. The OTP is emailed via [Resend](https://resend.com)'s API.
-4. **`/reset-password`** — enter the code along with a new password.
-5. On success the code is immediately burned (can't be reused), and the password is updated.
-
-**Security details:**
-- The response to `/forgot-password` is identical whether or not the email exists, so this endpoint can't be used to check which emails are registered.
-- Wrong codes are limited to 5 attempts; after that, the code is locked out (even the correct code stops working) and a new one must be requested.
-- Codes expire after 10 minutes.
-- OTPs are stored as bcrypt hashes, never in plaintext.
-
-### Setting up Resend
-
-1. Create a free account at [resend.com](https://resend.com) and grab an API key.
-2. Set `RESEND_API_KEY` in your `.env`.
-3. Set `RESEND_FROM_EMAIL` — Resend's shared `onboarding@resend.dev` sender works for testing without any domain setup; verify your own domain in Resend for production use.
-
-**In development, if `RESEND_API_KEY` is left unset, the OTP is printed to the server console instead of emailed** — so the whole flow can be tested locally without a Resend account. In production, a missing key raises a clear error the moment someone requests a reset (not at server boot, so installs that don't use this feature aren't forced to configure it).
-
----
-
-# 🧠 How Balance Updates Work
-
-Ledger keeps account balances synchronized with financial operations.
-
-### Expense
-
-```text
-Account
-  │
-  ├── subtract expense
-  │
-  ▼
-Updated balance
-```
-
-### Transfer
-
-```text
-Source Account
-      │
-      ├── subtract
-      │
-      ▼
-Destination Account
-      │
-      └── add
-```
-
-### Delete Expense
-
-```text
-Deleted Expense
-      │
-      └── restore amount
-              │
-              ▼
-        Original Account
-```
-
-These operations use database transactions so that related changes are committed together.
-
----
-
-# 📱 Responsive Design
-
-Ledger includes a custom stylesheet under:
-
-```text
-public/css/style.css
-```
-
-The interface is designed to work across:
-
-- 💻 Desktop
-- 💻 Laptop
-- 📱 Mobile
-- 📟 Small-screen devices
-
-The navigation and dashboard components adapt to smaller screen sizes.
-
----
-
-# 🧪 Development
-
-Start the development server:
-
+Redis isn't running or isn't reachable. Start Redis:
 ```bash
-npm run dev
+# Docker
+docker run -d -p 6379:6379 redis
+
+# Or check if it's running
+redis-cli ping   # should reply: PONG
 ```
 
-The project uses Node's built-in watch mode, so the server automatically restarts when server-side files change.
-
-## Running tests locally
-
-The test suite runs against a real PostgreSQL database (no mocks) using Node's built-in test runner — no extra test framework to install.
-
-```bash
-# Point at any throwaway Postgres database
-export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ledger_test
-
-npm run lint   # parses every .js file, fails fast on syntax errors
-npm test       # runs test/*.test.js — unit tests + full integration tests
-```
-
-`npm test` creates its own tables via the same `initSchema()` the app uses on boot, registers real users, and exercises accounts, credit-limit spend/repay/overpay capping, EMI accounts, transfers, imports, budgets, loans, and the reports date-range logic end-to-end. It's safe to point at a disposable local database — each run uses uniquely-generated emails so it won't collide with itself.
-
----
-
-# 🤖 Continuous Integration
-
-Every push and every pull request targeting `main` automatically runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml), which:
-
-1. Spins up a real, throwaway PostgreSQL 16 service container (not a mock).
-2. Installs dependencies with `npm ci` on Node 20.x **and** 22.x.
-3. Runs `npm run lint` — a syntax pass over every source file.
-4. Runs `npm test` — the full test suite described above.
-5. Confirms the Express app boots cleanly.
-
-If any step fails, the check shows up red on the commit/PR — anyone can see at a glance whether a contributor's change is safe to merge, without pulling the branch down and running it manually.
-
-### Requiring this check before merging
-
-The workflow alone only *reports* status — to actually **block merging** until it passes, a repository owner needs to turn on branch protection once:
-
-1. On GitHub: **Settings → Branches → Add branch protection rule**.
-2. Branch name pattern: `main` (or `master`, whichever is the default).
-3. Enable **"Require status checks to pass before merging"**.
-4. Search for and select the `Lint & test (Node 20.x)` and `Lint & test (Node 22.x)` checks (they'll appear in the list after the workflow has run at least once).
-5. Optionally also enable **"Require branches to be up to date before merging"** so PRs are always tested against the latest `main`.
-
-After that, GitHub disables the merge button on any pull request — from a contributor or the owner — until CI is green.
-
----
-
-# 🔧 Useful Development Commands
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Run development server:
-
-```bash
-npm run dev
-```
-
-Run production server:
-
-```bash
-npm start
-```
-
----
-
-# 🐛 Troubleshooting
+Then make sure `REDIS_URL` in your `.env` points to the right host/port.
+</details>
 
 <details>
 <summary><strong>❌ DATABASE_URL is not set</strong></summary>
 
-Make sure your `.env` file contains:
-
+Your `.env` file is missing or in the wrong directory. Make sure it's in the project root (same folder as `server.js`) and contains:
 ```env
 DATABASE_URL=postgresql://postgres:password@localhost:5432/ledger
 ```
-
-Then restart the server.
-
 </details>
 
 <details>
-<summary><strong>❌ PostgreSQL connection error</strong></summary>
+<summary><strong>❌ PostgreSQL connection refused</strong></summary>
 
-Check that PostgreSQL is running and that:
+Check that PostgreSQL is running:
+```bash
+# Windows
+pg_ctl status
 
-- Database name is correct
-- Username is correct
-- Password is correct
-- Port is correct
-- `DATABASE_URL` is valid
-
+# Or test the port
+Test-NetConnection -ComputerName localhost -Port 5432
+```
 </details>
 
 <details>
-<summary><strong>❌ Account or expense isn't being created</strong></summary>
+<summary><strong>❌ Session/login not working in production</strong></summary>
 
-Check:
-
-1. PostgreSQL is running.
-2. `DATABASE_URL` is correct.
-3. The server started without database errors.
-4. Browser requests are reaching the server.
-5. `SESSION_SECRET` is configured correctly in production.
-
-The application logs database/server errors to the Node.js console.
-
-</details>
-
-<details>
-<summary><strong>❌ Session/login problems in production</strong></summary>
-
-Make sure:
-
+Make sure all three are set:
 ```env
 NODE_ENV=production
 SESSION_SECRET=your-long-random-secret
+REDIS_URL=your-redis-url
 ```
+Sessions require Redis in production. Without it, every request will fail.
+</details>
 
-The application uses secure cookies when running in production.
+<details>
+<summary><strong>❌ Password reset emails not sending</strong></summary>
 
+Set `RESEND_API_KEY` in your `.env`. In development, if it's not set, the OTP is logged to the console — check your terminal output.
 </details>
 
 ---
 
-# 🚀 Deployment
+## 📄 License
 
-Ledger can be deployed to a Node.js hosting platform with PostgreSQL support.
-
-A typical deployment requires:
-
-```text
-Node.js application
-        +
-PostgreSQL database
-        +
-Environment variables
-```
-
-Set these environment variables on your hosting provider:
-
-```env
-DATABASE_URL=your-postgresql-connection-string
-SESSION_SECRET=your-secure-random-secret
-NODE_ENV=production
-```
-
-The application automatically initializes the PostgreSQL schema when it starts.
+MIT
 
 ---
-
-# 🔄 Data Initialization & Migration
-
-Database initialization is handled by:
-
-```text
-src/db/schema.js
-```
-
-At startup, the application:
-
-1. Connects to PostgreSQL
-2. Creates required tables if they don't exist
-3. Creates indexes
-4. Adds required account columns (including `credit_limit` for Credit Card/EMI accounts)
-5. Creates default Cash and Online accounts
-6. Migrates legacy wallet balances into accounts
-7. Links older expenses to accounts
-8. Links older transfers to accounts
-
-This makes the application more resilient when moving from the older wallet structure to the account-based structure.
-
----
-
-# 📌 Expense Categories
-
-Ledger supports expense categories such as:
-
-```text
-🍔 Food & Dining
-🚗 Transport
-🛒 Groceries
-🛍️ Shopping
-💡 Bills & Utilities
-🏠 Rent
-🎬 Entertainment
-❤️ Health
-📚 Education
-✈️ Travel
-📦 Other
-```
-
----
-
-# 🔒 Data Ownership
-
-Each user's financial data is associated with their own `user_id`.
-
-Authenticated routes only query data belonging to the logged-in user.
-
-```text
-User A
- ├── Accounts
- ├── Expenses
- ├── Budgets
- ├── Transfers
- └── Loans
-
-User B
- ├── Accounts
- ├── Expenses
- ├── Budgets
- ├── Transfers
- └── Loans
-```
-
-Users don't share financial records with each other.
-
----
-
-# 🛠️ Future Improvements
-
-Some possible additions for future versions:
-
-- 📈 Interactive charts
-- 📤 Export expenses to CSV/Excel
-- 📄 PDF reports
-- 🔔 Budget alerts
-- 🔍 Advanced transaction search
-- 🔐 Password reset
-- 👤 Profile settings
-- 🌙 Dark mode
-- 📱 Progressive Web App support
-- 📊 More detailed analytics
-- 🔁 Recurring expenses
-- 💱 Multiple currencies
-- ☁️ Automated backups
-
----
-
-# 🤝 Contributing
-
-Contributions are welcome.
-
-### Adding a new feature module
-
-Thanks to the modular layout, most new features don't touch existing code at all:
-
-1. Create `src/modules/<feature>/` with `<feature>.repository.js` (SQL), `<feature>.service.js` (validation/logic), and `<feature>.routes.js` (Express routes).
-2. Add any new tables to `src/db/schema.js` (it's safe to run repeatedly — use `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
-3. Mount the router in `src/app.js` — one line, inside `protectedRouter` if it needs login.
-4. Add a view under `views/` if it renders a page.
-
-If your feature needs data from another module (e.g. a report that needs both expenses and budgets), import that module's **service**, never its repository — that keeps each module's SQL private to itself.
-
-### 1. Fork the repository
-
-```bash
-git fork <repository-url>
-```
-
-### 2. Create a branch
-
-```bash
-git checkout -b feature/my-feature
-```
-
-### 3. Make your changes
-
-### 4. Commit
-
-```bash
-git commit -m "Add my feature"
-```
-
-### 5. Push
-
-```bash
-git push origin feature/my-feature
-```
-
-### 6. Open a Pull Request
-
----
-
-# 📄 License
-
-Add your preferred license here.
-
-For example:
-
-```text
-MIT License
-```
-
----
-
-# 👨‍💻 Built With
-
-Made with:
-
-**Node.js + Express + PostgreSQL + EJS + JavaScript + CSS**
-
----
-
-
-### 💰 Ledger
 
 **Track it. Understand it. Control it.**
 
-⭐ If you find Ledger useful, consider giving the repository a star!
-
+⭐ If you find Ledger useful, give it a star!

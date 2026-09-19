@@ -15,12 +15,17 @@ if (isProduction && !process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET must be set in production.');
 }
 
+if (isProduction && !process.env.REDIS_URL) {
+  throw new Error('REDIS_URL must be set in production.');
+}
+
 module.exports = {
   isProduction,
   port: Number(process.env.PORT || 3000),
   databaseUrl: process.env.DATABASE_URL,
   dbPoolMax: Number(process.env.DB_POOL_MAX || 10),
   sessionSecret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+  redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
 
   // Used to email OTP codes for "forgot password". Optional in
   // development — if unset, the OTP is logged to the console instead
@@ -29,5 +34,7 @@ module.exports = {
   // reset, so installs that don't use this feature aren't forced to
   // configure it).
   resendApiKey: process.env.RESEND_API_KEY || null,
-  resendFromEmail: process.env.RESEND_FROM_EMAIL || 'Ledger <onboarding@resend.dev>'
+  resendFromEmail: process.env.RESEND_FROM_EMAIL || 'Ledger <onboarding@resend.dev>',
+
+  logLevel: process.env.LOG_LEVEL || 'info'
 };

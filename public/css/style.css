@@ -1439,3 +1439,44 @@ textarea:focus {
 
 @media (max-width:720px){.topnav{max-height:calc(100vh - 60px);overflow-y:auto}.topnav .topbar-user{display:flex!important}.filter-form{align-items:stretch;flex-direction:column}.filter-form label{width:100%}.filter-form .btn{width:100%}.inline-form{width:100%;margin-top:8px}.inline-form input{flex:1;width:auto}.account-item,.loan-item{flex-wrap:wrap}.trend-row{grid-template-columns:52px 1fr 82px}.ledger-table-full{min-width:680px}}
 @media (max-width:480px){.trend-row{grid-template-columns:48px 1fr 76px}.account-item,.loan-item{align-items:flex-start}.inline-form{flex-basis:100%}}
+
+
+/* ============================================================
+   Activity log (Profile page)
+   ============================================================ */
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+
+  font-size: 13px;
+}
+
+.activity-item:last-child {
+  border-bottom: 0;
+}
+
+.activity-item small {
+  color: var(--ink-soft);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.activity-item.activity-warn span {
+  color: var(--rust);
+  font-weight: 600;
+}
