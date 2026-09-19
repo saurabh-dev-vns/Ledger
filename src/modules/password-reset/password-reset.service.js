@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const { runInTransaction } = require('../../core/transaction');
 const authService = require('../auth/auth.service');
 const profileService = require('../profile/profile.service');
+const auditService = require('../audit/audit.service');
+const { ACTIONS } = require('../audit/audit.constants');
 const repo = require('./password-reset.repository');
 const mailer = require('./password-reset.mailer');
 
@@ -47,6 +49,7 @@ async function requestReset(email) {
     // code still exists and the person can hit "resend" to try again
     // rather than losing a validly-stored OTP to a rolled-back email step.
     await mailer.sendOtpEmail(email, user.name, otp);
+    await auditService.log(user.id, ACTIONS.PASSWORD_RESET_REQUESTED);
 }
 
 /**
@@ -117,6 +120,7 @@ async function verifyAndReset(email, otp, newPassword, confirmPassword) {
     // The OTP is already burned at this point (can't be replayed) even
     // if this next step somehow fails — the person just requests a new one.
     await profileService.resetPasswordDirectly(user.id, newPassword);
+    await auditService.log(user.id, ACTIONS.PASSWORD_RESET_COMPLETED);
 }
 
 module.exports = { requestReset, verifyAndReset };

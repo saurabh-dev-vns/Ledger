@@ -1,4 +1,5 @@
 const pool = require('./pool');
+const logger = require('../core/logger');
 
 /**
  * Creates every table fresh, and migrates existing databases forward
@@ -12,8 +13,12 @@ async function initSchema() {
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      deleted_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+    CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at) WHERE deleted_at IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS wallets (
       user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -116,12 +121,21 @@ async function initSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      action TEXT NOT NULL,
+      details TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, spent_on);
     CREATE INDEX IF NOT EXISTS idx_balance_log_user_date ON balance_log(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_wallet_transfers_user_date ON wallet_transfers(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_budgets_user_month ON budgets(user_id, month);
     CREATE INDEX IF NOT EXISTS idx_loans_user ON loans(user_id);
     CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_user_date ON audit_logs(user_id, created_at);
 
     INSERT INTO accounts(user_id, name, type, balance)
     SELECT u.id, 'Cash', 'cash', COALESCE(w.cash_balance, 0)
@@ -152,7 +166,7 @@ async function initSchema() {
       AND fa.name IN ('Cash','Online') AND ta.name IN ('Cash','Online');
   `);
 
-  console.log('PostgreSQL database initialized.');
+  logger.info('PostgreSQL database initialized.');
 }
 
 module.exports = { initSchema };

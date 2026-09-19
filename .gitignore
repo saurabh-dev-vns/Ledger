@@ -3,3 +3,6 @@ data.sqlite
 data.sqlite-*
 sessions.sqlite
 .env
+
+# Log files generated at runtime — never commit these
+logs/

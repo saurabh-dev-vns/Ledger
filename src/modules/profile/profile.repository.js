@@ -32,11 +32,30 @@ async function updatePasswordHash(userId, passwordHash, client = pool) {
     );
 }
 
-async function deleteUser(userId, client = pool) {
-    // ON DELETE CASCADE on every user-owned table (accounts, expenses,
-    // budgets, loans, wallet_transfers, balance_log) takes care of the
-    // rest — deleting the user row is enough.
-    await client.query('DELETE FROM users WHERE id = $1', [userId]);
+async function softDeleteUser(userId, client = pool) {
+    await client.query('UPDATE users SET deleted_at = NOW() WHERE id = $1', [userId]);
+}
+
+async function restoreUser(userId, client = pool) {
+    await client.query('UPDATE users SET deleted_at = NULL WHERE id = $1', [userId]);
+}
+
+/**
+ * Permanently deletes any account whose soft-delete grace period has
+ * expired. ON DELETE CASCADE on every user-owned table (accounts,
+ * expenses, budgets, loans, wallet_transfers, balance_log,
+ * password_resets) takes care of removing everything else.
+ */
+async function purgeExpired(graceDays, client = pool) {
+    const r = await client.query(
+        `DELETE FROM users
+         WHERE deleted_at IS NOT NULL
+         AND deleted_at < NOW() - make_interval(days => $1)
+         RETURNING id`,
+        [graceDays]
+    );
+
+    return r.rowCount;
 }
 
 async function getStats(userId, client = pool) {
@@ -57,6 +76,8 @@ module.exports = {
     findByEmailExcludingUser,
     updateNameAndEmail,
     updatePasswordHash,
-    deleteUser,
+    softDeleteUser,
+    restoreUser,
+    purgeExpired,
     getStats
 };

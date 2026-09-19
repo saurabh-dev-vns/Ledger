@@ -5,7 +5,7 @@ async function findSessionUser(req) {
   if (!req.session.userId) return null;
 
   const result = await pool.query(
-    'SELECT id, name FROM users WHERE id = $1',
+    'SELECT id, name FROM users WHERE id = $1 AND deleted_at IS NULL',
     [req.session.userId]
   );
 
@@ -20,8 +20,8 @@ async function requireLogin(req, res, next) {
   try {
     const user = await findSessionUser(req);
     if (!user) {
-      req.session = null;
-      return res.redirect('/login');
+      req.session.destroy(() => res.redirect('/login'));
+      return;
     }
 
     req.session.userName = user.name;
@@ -41,8 +41,7 @@ async function redirectIfLoggedIn(req, res, next) {
       return res.redirect('/dashboard');
     }
 
-    req.session = null;
-    next();
+    req.session.destroy(() => next());
   } catch (err) {
     next(err);
   }

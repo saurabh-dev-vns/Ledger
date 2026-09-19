@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
 const { runInTransaction } = require('../../core/transaction');
 const repo = require('./profile.repository');
+const { RESTORE_WINDOW_DAYS } = require('./profile.constants');
+const auditService = require('../audit/audit.service');
+const { ACTIONS } = require('../audit/audit.constants');
 
 function isValidEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -47,6 +50,7 @@ async function updateProfile(userId, name, email) {
     }
 
     await repo.updateNameAndEmail(userId, name, email);
+    await auditService.log(userId, ACTIONS.PROFILE_UPDATED);
 
     return { name, email };
 }
@@ -80,8 +84,14 @@ async function changePassword(userId, currentPassword, newPassword, confirmPassw
 
     const hash = await bcrypt.hash(newPassword, 10);
     await repo.updatePasswordHash(userId, hash);
+    await auditService.log(userId, ACTIONS.PASSWORD_CHANGED);
 }
 
+/**
+ * Soft-deletes the account: it's hidden and unusable immediately, but
+ * kept for RESTORE_WINDOW_DAYS in case the person logs back in and
+ * wants it back. Permanent deletion happens later via purgeExpired().
+ */
 async function deleteAccount(userId, password) {
     if (!password) {
         throw new Error('Enter your password to confirm.');
@@ -97,7 +107,19 @@ async function deleteAccount(userId, password) {
         throw new Error('Incorrect password.');
     }
 
-    return runInTransaction(client => repo.deleteUser(userId, client));
+    await runInTransaction(client => repo.softDeleteUser(userId, client));
+    await auditService.log(userId, ACTIONS.ACCOUNT_DELETED);
+}
+
+/** Cancels a pending soft-delete, called from the login-time restore flow. */
+async function restoreAccount(userId) {
+    await repo.restoreUser(userId);
+    await auditService.log(userId, ACTIONS.ACCOUNT_RESTORED);
+}
+
+/** Permanently removes accounts whose restore window has expired. Safe to call repeatedly/concurrently. */
+async function purgeExpiredDeletedAccounts() {
+    return repo.purgeExpired(RESTORE_WINDOW_DAYS);
 }
 
 /**
@@ -115,4 +137,12 @@ async function resetPasswordDirectly(userId, newPassword) {
     await repo.updatePasswordHash(userId, hash);
 }
 
-module.exports = { getProfile, updateProfile, changePassword, deleteAccount, resetPasswordDirectly };
+module.exports = {
+    getProfile,
+    updateProfile,
+    changePassword,
+    deleteAccount,
+    restoreAccount,
+    purgeExpiredDeletedAccounts,
+    resetPasswordDirectly
+};

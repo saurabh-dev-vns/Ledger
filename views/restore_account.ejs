@@ -1,0 +1,45 @@
+<%- include('partials/header') %>
+
+<div class="auth-wrap">
+
+    <div class="auth-card">
+        <p class="auth-eyebrow">
+            Account recovery
+        </p>
+
+        <h1>
+            Welcome back, <%= name %>
+        </h1>
+
+        <p class="auth-sub">
+            This account was deleted but is still recoverable until
+            <strong><%= new Date(purgeAt).toDateString() %></strong>
+            — that's the <%= restoreWindowDays %>-day restore window.
+            After that it's gone for good, including every account,
+            expense, and budget attached to it.
+        </p>
+
+        <p class="auth-sub">
+            Want it back?
+        </p>
+
+        <form method="POST" action="/restore-account" class="form">
+            <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+
+            <button type="submit" class="btn btn-primary btn-block">
+                Restore my account
+            </button>
+        </form>
+
+        <form method="POST" action="/restore-account/cancel" class="form" style="margin-top:12px">
+            <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+
+            <button type="submit" class="btn btn-secondary btn-block">
+                No thanks, keep it deleted
+            </button>
+        </form>
+    </div>
+
+</div>
+
+<%- include('partials/footer') %>

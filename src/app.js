@@ -1,8 +1,12 @@
 const path = require('path');
 const express = require('express');
-const cookieSession = require('cookie-session');
+const session = require('express-session');
+const { RedisStore } = require('connect-redis');
+const pinoHttp = require('pino-http');
 
 const env = require('./config/env');
+const logger = require('./core/logger');
+const redisClient = require('./db/redis');
 const { locals, requireLogin } = require('./middleware/session');
 
 const authRoutes = require('./modules/auth/auth.routes');
@@ -25,16 +29,47 @@ function createApp() {
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, '..', 'views'));
 
+    // Logs one line per request (method, path, status, response time).
+    // Attaches req.log so route handlers can log with the same request
+    // context if needed. Cookies/authorization headers are redacted so
+    // session tokens never end up in logs.
+    app.use(pinoHttp({
+        logger,
+        redact: {
+            paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
+            censor: '[redacted]'
+        },
+        // Stamp userId on every request log so you can filter by user
+        // in Datadog / Papertrail / any log aggregator without joining tables.
+        customProps: (req) => ({
+            userId: req.session?.userId ?? null
+        }),
+        // Quieter logs for static assets; everything else at its natural level.
+        customLogLevel: (req, res, err) => {
+            if (err || res.statusCode >= 500) return 'error';
+            if (res.statusCode >= 400) return 'warn';
+            return 'info';
+        },
+        autoLogging: {
+            ignore: req => req.url.startsWith('/css/') || req.url.startsWith('/favicon')
+        }
+    }));
+
     app.use(express.urlencoded({ extended: false }));
     app.use(express.static(path.join(__dirname, '..', 'public')));
 
-    app.use(cookieSession({
+    app.use(session({
+        store: new RedisStore({ client: redisClient }),
+        secret: env.sessionSecret,
+        resave: false,
+        saveUninitialized: false,
         name: 'session',
-        keys: [env.sessionSecret],
-        maxAge: 1000 * 60 * 60 * 24 * 7,
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: env.isProduction
+        cookie: {
+            maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: env.isProduction
+        }
     }));
 
     app.use(locals);
@@ -68,7 +103,7 @@ function createApp() {
     });
 
     app.use((err, req, res, next) => {
-        console.error(err);
+        (req.log || logger).error({ err }, 'Unhandled request error');
         if (res.headersSent) return next(err);
         res.status(500).send('Something went wrong. Please try again.');
     });

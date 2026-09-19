@@ -61,6 +61,28 @@
     </div>
 
     <div class="card">
+        <h2>Recent activity</h2>
+
+        <% if (!activity.length) { %>
+            <p class="hint" style="margin-top:0">Nothing recorded yet.</p>
+        <% } else { %>
+            <div class="activity-list">
+                <% activity.forEach(item => { %>
+                    <div class="activity-item <%= item.action === 'login_failed' ? 'activity-warn' : '' %>">
+                        <span><%= item.label %></span>
+                        <small><%= formatDateTime(item.createdAt) %></small>
+                    </div>
+                <% }) %>
+            </div>
+        <% } %>
+
+        <p class="hint">
+            This is a record of sign-ins and account changes on your
+            account, so you can spot anything you didn't do.
+        </p>
+    </div>
+
+    <div class="card">
         <h2>Change password</h2>
 
         <form method="POST" action="/profile/password" class="form">
@@ -91,16 +113,18 @@
         <h2>Delete account</h2>
 
         <p class="hint" style="margin-top:0">
-            This permanently deletes your account and every account,
-            expense, transfer, budget, and loan attached to it. This
-            cannot be undone.
+            Your account and everything attached to it will be deactivated
+            immediately. You have 30 days to change your mind — just log
+            back in with your usual email and password to restore
+            everything. After 30 days it's permanently deleted and can't
+            be recovered.
         </p>
 
         <form
             method="POST"
             action="/profile/delete"
             class="form"
-            onsubmit="return confirm('This will permanently delete your account and all your data. This cannot be undone. Continue?');"
+            onsubmit="return confirm('Delete your account? You\'ll have 30 days to restore it by logging back in, after which it is permanently deleted. Continue?');"
         >
             <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
 
@@ -110,7 +134,7 @@
             </label>
 
             <button class="btn btn-danger btn-block">
-                Permanently delete my account
+                Delete my account
             </button>
         </form>
     </div>

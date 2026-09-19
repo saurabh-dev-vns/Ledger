@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const env = require('../config/env');
+const logger = require('../core/logger');
 
 const pool = new Pool({
   connectionString: env.databaseUrl,
@@ -9,6 +10,6 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000
 });
 
-pool.on('error', err => console.error('Unexpected PostgreSQL pool error:', err));
+pool.on('error', err => logger.error({ err }, 'Unexpected PostgreSQL pool error'));
 
 module.exports = pool;

@@ -20,7 +20,7 @@ router.post('/forgot-password', redirectIfLoggedIn, checkCsrf, async (req, res) 
         // Only a genuine infrastructure failure (e.g. Resend down) reaches
         // here — "email not found" is handled silently inside the service
         // so it never distinguishes itself from a successful request.
-        console.error('Password reset request failed:', e);
+        req.log.error({ err: e }, 'Password reset request failed');
     }
 
     setFlash(req, GENERIC_REQUEST_MESSAGE, 'success');
