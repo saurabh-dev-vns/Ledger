@@ -22,28 +22,39 @@
 
             <label>
                 From
-                <select name="from_account_id" id="fromAccount" required>
+                <select name="from_account_id" id="fromAccount" required data-savings-target="from-part">
                     <% accounts.forEach(a=>{ %>
-                        <option value="<%=a.id%>">
-                            <%=a.name%> — ₹<%=money(a.balance)%>
+                        <option value="<%=a.id%>" data-savings="<%= a.type === 'savings' ? 1 : 0 %>">
+                            <%=a.name%> — ₹<%=money(a.balance)%> <%= a.type === 'savings' ? '(' + savingsSplit(a) + ')' : '' %>
                         </option>
                     <% }) %>
                 </select>
             </label>
 
+            <%- include('partials/savings_part', {
+                id: 'from-part', name: 'from_part', label: 'Take from Savings',
+                savings: accounts.find(a => a.type === 'savings')
+            }) %>
+
             <label>
                 To
-                <select name="to_account_id" id="toAccount" required>
+                <select name="to_account_id" id="toAccount" required data-savings-target="to-part">
                     <% accounts.forEach((a,i)=>{ %>
                         <option
                             value="<%=a.id%>"
+                            data-savings="<%= a.type === 'savings' ? 1 : 0 %>"
                             <%=i===1?'selected':''%>
                         >
-                            <%=a.name%> — ₹<%=money(a.balance)%>
+                            <%=a.name%> — ₹<%=money(a.balance)%> <%= a.type === 'savings' ? '(' + savingsSplit(a) + ')' : '' %>
                         </option>
                     <% }) %>
                 </select>
             </label>
+
+            <%- include('partials/savings_part', {
+                id: 'to-part', name: 'to_part', label: 'Put into Savings',
+                savings: accounts.find(a => a.type === 'savings')
+            }) %>
 
             <label>
                 Amount (₹)
@@ -79,6 +90,7 @@
             <div class="balance-row">
                 <span>
                     <%=a.name%>
+                    <% if (a.type === 'savings') { %><small class="split-note"><%= savingsSplit(a) %></small><% } %>
                 </span>
 
                 <span class="balance-figure">

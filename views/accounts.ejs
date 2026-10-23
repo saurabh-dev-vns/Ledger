@@ -40,6 +40,23 @@
                 </select>
             </label>
 
+            <div id="savings-fields" style="display:none">
+                <label>
+                    Cash in Savings (₹)
+                    <input type="number" name="cash_opening" step="0.01" min="0" value="0">
+                </label>
+
+                <label>
+                    Bank in Savings (₹)
+                    <input type="number" name="bank_opening" step="0.01" min="0" value="0">
+                </label>
+
+                <p class="hint">
+                    You can only have one Savings account. It keeps your cash
+                    and bank savings together and shows how much is in each.
+                </p>
+            </div>
+
             <label id="opening-balance-field">
                 Opening balance
                 <input
@@ -74,11 +91,17 @@
                 const balanceField = document.getElementById('opening-balance-field');
                 const limitField = document.getElementById('credit-limit-field');
                 const limitInput = limitField.querySelector('input');
+                const savingsFields = document.getElementById('savings-fields');
+                const nameInput = document.querySelector('#add-account-form input[name="name"]');
                 const creditTypes = ['credit', 'emi'];
 
                 const sync = () => {
                     const isCredit = creditTypes.includes(typeSelect.value);
-                    balanceField.style.display = isCredit ? 'none' : '';
+                    const isSavings = typeSelect.value === 'savings';
+                    savingsFields.style.display = isSavings ? '' : 'none';
+                    savingsFields.querySelectorAll('input').forEach((i) => { i.disabled = !isSavings; });
+                    if (isSavings && !nameInput.value) nameInput.value = 'Savings';
+                    balanceField.style.display = (isCredit || isSavings) ? 'none' : '';
                     limitField.style.display = isCredit ? '' : 'none';
                     limitInput.required = isCredit;
                 };
@@ -95,12 +118,20 @@
         <div class="account-list">
             <% accounts.forEach(a=>{ %>
                 <% const credit = isCreditType(a.type) && a.credit_limit !== null; %>
+                <% const savings = a.type === 'savings'; %>
                 <% const used = credit ? a.credit_limit - a.balance : 0; %>
 
-                <div class="account-item">
+                <div class="account-item <%= savings ? 'account-item-savings' : '' %>">
                     <div>
                         <strong><%= a.name %></strong>
                         <small><%= accountTypeLabel(a.type) %></small>
+
+                        <% if (savings) { %>
+                            <div class="split-chips">
+                                <span class="chip chip-cash">Cash ₹<%= money(a.cash_part) %></span>
+                                <span class="chip chip-bank">Bank ₹<%= money(a.bank_part) %></span>
+                            </div>
+                        <% } %>
 
                         <% if (credit) { %>
                             <small>
@@ -128,6 +159,13 @@
                             value="<%= csrfToken %>"
                         >
 
+                        <% if (savings) { %>
+                            <select name="part" required aria-label="Add to Cash or Bank">
+                                <option value="cash">Cash</option>
+                                <option value="bank">Bank</option>
+                            </select>
+                        <% } %>
+
                         <input
                             type="number"
                             name="amount"
@@ -141,9 +179,41 @@
                             <%= credit ? 'Repay' : 'Add' %>
                         </button>
                     </form>
+
+                    <% if (savings) { %>
+                        <form
+                            method="POST"
+                            action="/accounts/<%= a.id %>/move"
+                            class="inline-form move-form"
+                        >
+                            <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+
+                            <select name="from" required aria-label="Direction">
+                                <option value="cash">Cash → Bank</option>
+                                <option value="bank">Bank → Cash</option>
+                            </select>
+
+                            <input
+                                type="number"
+                                name="amount"
+                                step="0.01"
+                                min="0.01"
+                                placeholder="Move ₹"
+                                required
+                            >
+
+                            <button class="btn btn-secondary">Move</button>
+                        </form>
+                    <% } %>
                 </div>
             <% }) %>
         </div>
+
+        <p class="hint">
+            Savings keeps cash and bank money together. “Add” puts money
+            into the part you pick; “Move” shifts money between Cash and
+            Bank without changing your total.
+        </p>
 
         <p class="hint">
             For Credit Card and EMI accounts, spending reduces the

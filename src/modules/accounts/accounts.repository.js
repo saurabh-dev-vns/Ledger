@@ -1,4 +1,5 @@
 const pool = require('../../db/pool');
+const { SAVINGS_PARTS } = require('./accounts.constants');
 
 /** Every user always has a Cash and an Online account; this makes sure they exist. */
 async function ensureAccounts(userId, client = pool) {
@@ -11,7 +12,7 @@ async function ensureAccounts(userId, client = pool) {
 
 async function listAccounts(userId, client = pool) {
     const r = await client.query(
-        `SELECT id,name,type,balance,credit_limit,created_at
+        `SELECT id,name,type,balance,credit_limit,cash_part,bank_part,created_at
          FROM accounts
          WHERE user_id=$1
          ORDER BY CASE
@@ -25,21 +26,30 @@ async function listAccounts(userId, client = pool) {
     return r.rows;
 }
 
-async function insertAccount(userId, name, type, balance, creditLimit, client = pool) {
+async function insertAccount(userId, name, type, balance, creditLimit, client = pool, cashPart = null, bankPart = null) {
     const r = await client.query(
-        `INSERT INTO accounts(user_id,name,type,balance,credit_limit)
-         VALUES($1,$2,$3,$4,$5)
+        `INSERT INTO accounts(user_id,name,type,balance,credit_limit,cash_part,bank_part)
+         VALUES($1,$2,$3,$4,$5,$6,$7)
          RETURNING id`,
-        [userId, name, type, balance, creditLimit]
+        [userId, name, type, balance, creditLimit, cashPart, bankPart]
     );
 
     return r.rows[0].id;
 }
 
+async function findSavingsAccount(userId, client = pool) {
+    const r = await client.query(
+        `SELECT id FROM accounts WHERE user_id=$1 AND type='savings' LIMIT 1`,
+        [userId]
+    );
+
+    return r.rows[0] || null;
+}
+
 /** Row-locks and returns one account (type/balance/credit_limit), or null. */
 async function getAccountForUpdate(userId, accountId, client) {
     const r = await client.query(
-        `SELECT name,type,balance,credit_limit
+        `SELECT name,type,balance,credit_limit,cash_part,bank_part
          FROM accounts
          WHERE id=$1 AND user_id=$2
          FOR UPDATE`,
@@ -63,8 +73,40 @@ async function findFirstAccountByType(userId, type, client = pool) {
     return r.rows[0]?.id || null;
 }
 
-/** Debits an account, but only if it has enough balance. Returns the updated row, or null if insufficient. */
-async function debitAccount(userId, accountId, amount, client) {
+const SAVINGS_RETURNING = 'RETURNING type,balance,credit_limit,cash_part,bank_part';
+
+function requireSavingsPart(part, action) {
+    if (!SAVINGS_PARTS.includes(part)) {
+        throw new Error(`Choose whether ${action} Savings Cash or Savings Bank.`);
+    }
+
+    return part === 'cash' ? 'cash_part' : 'bank_part';
+}
+
+/**
+ * Debits an account, but only if it has enough balance. Returns the
+ * updated row, or null if insufficient. For a Savings account the
+ * money must come from one specific part ("cash" or "bank").
+ */
+async function debitAccount(userId, accountId, amount, client, part = null) {
+    const account = await getAccountForUpdate(userId, accountId, client);
+
+    if (!account) return null;
+
+    if (account.type === 'savings') {
+        const col = requireSavingsPart(part, 'to take money from');
+
+        const r = await client.query(
+            `UPDATE accounts
+             SET ${col}=${col}-$1, balance=balance-$1
+             WHERE id=$2 AND user_id=$3 AND ${col} >= $1
+             ${SAVINGS_RETURNING}`,
+            [amount, accountId, userId]
+        );
+
+        return r.rows[0] || null;
+    }
+
     const r = await client.query(
         `UPDATE accounts
          SET balance=balance-$1
@@ -76,13 +118,47 @@ async function debitAccount(userId, accountId, amount, client) {
     return r.rows[0] || null;
 }
 
-/** Plain top-up: balance increases with no ceiling (Cash/Bank/Online/Other). */
-async function creditAccountPlain(userId, accountId, amount, client) {
+/** Plain top-up: balance increases with no ceiling. For Savings, into the chosen part. */
+async function creditAccountPlain(userId, accountId, amount, client, part = null) {
+    const account = await getAccountForUpdate(userId, accountId, client);
+
+    if (!account) return null;
+
+    if (account.type === 'savings') {
+        const col = requireSavingsPart(part, 'to add money to');
+
+        const r = await client.query(
+            `UPDATE accounts
+             SET ${col}=${col}+$1, balance=balance+$1
+             WHERE id=$2 AND user_id=$3
+             ${SAVINGS_RETURNING}`,
+            [amount, accountId, userId]
+        );
+
+        return r.rows[0] || null;
+    }
+
     const r = await client.query(
         `UPDATE accounts
          SET balance=balance+$1
          WHERE id=$2 AND user_id=$3
          RETURNING type,balance,credit_limit`,
+        [amount, accountId, userId]
+    );
+
+    return r.rows[0] || null;
+}
+
+/** Moves money between the Cash and Bank parts of a Savings account (total unchanged). Null if that part is short. */
+async function moveWithinSavings(userId, accountId, from, amount, client) {
+    const src = requireSavingsPart(from, 'to move money out of');
+    const dst = src === 'cash_part' ? 'bank_part' : 'cash_part';
+
+    const r = await client.query(
+        `UPDATE accounts
+         SET ${src}=${src}-$1, ${dst}=${dst}+$1
+         WHERE id=$2 AND user_id=$3 AND type='savings' AND ${src} >= $1
+         ${SAVINGS_RETURNING}`,
         [amount, accountId, userId]
     );
 
@@ -103,11 +179,11 @@ async function creditAccountCapped(userId, accountId, amount, client) {
 }
 
 /** Records one "amount added" entry: which account, how much, when (created_at) and why (note). */
-async function insertBalanceLog(userId, accountId, type, amount, note, kind = 'topup', client = pool) {
+async function insertBalanceLog(userId, accountId, type, amount, note, kind = 'topup', client = pool, part = null) {
     await client.query(
-        `INSERT INTO balance_log(user_id,account_id,type,amount,note,kind)
-         VALUES($1,$2,$3,$4,$5,$6)`,
-        [userId, accountId, type, amount, note || null, kind]
+        `INSERT INTO balance_log(user_id,account_id,type,amount,note,kind,part)
+         VALUES($1,$2,$3,$4,$5,$6,$7)`,
+        [userId, accountId, type, amount, note || null, kind, part]
     );
 }
 
@@ -118,7 +194,7 @@ async function insertBalanceLog(userId, accountId, type, amount, note, kind = 't
 async function listBalanceLog(userId, filters = {}, client = pool) {
     const params = [userId];
     let sql = `
-        SELECT bl.id, bl.amount, bl.note, bl.kind, bl.created_at,
+        SELECT bl.id, bl.amount, bl.note, bl.kind, bl.part, bl.created_at,
                bl.account_id, COALESCE(a.name, INITCAP(bl.type)) AS account_name,
                COALESCE(a.type, bl.type) AS account_type
         FROM balance_log bl
@@ -167,6 +243,8 @@ module.exports = {
     ensureAccounts,
     listAccounts,
     insertAccount,
+    findSavingsAccount,
+    moveWithinSavings,
     getAccountForUpdate,
     findFirstAccountByType,
     debitAccount,

@@ -1,5 +1,6 @@
 const pool = require('./pool');
 const logger = require('../core/logger');
+const { mergeLegacySavings } = require('./savings-merge');
 
 /**
  * Creates every table fresh, and migrates existing databases forward
@@ -36,6 +37,12 @@ async function initSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    -- Remembers which one-time data migrations have already run.
+    CREATE TABLE IF NOT EXISTS app_migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS session (
       sid VARCHAR NOT NULL PRIMARY KEY,
       sess JSON NOT NULL,
@@ -47,7 +54,7 @@ async function initSchema() {
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      type TEXT NOT NULL CHECK (type IN ('cash','online','bank','credit','emi','other')),
+      type TEXT NOT NULL CHECK (type IN ('cash','online','bank','savings','credit','emi','other')),
       balance NUMERIC(12,2) NOT NULL DEFAULT 0,
       credit_limit NUMERIC(12,2),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -56,13 +63,26 @@ async function initSchema() {
 
     ALTER TABLE accounts ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12,2);
 
+    -- Savings accounts keep a Cash part and a Bank part; balance is always their sum.
+    ALTER TABLE accounts ADD COLUMN IF NOT EXISTS cash_part NUMERIC(12,2);
+    ALTER TABLE accounts ADD COLUMN IF NOT EXISTS bank_part NUMERIC(12,2);
+
     ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_type_check;
     ALTER TABLE accounts ADD CONSTRAINT accounts_type_check
-      CHECK (type IN ('cash','online','bank','credit','emi','other'));
+      CHECK (type IN ('cash','online','bank','savings','credit','emi','other'));
 
     ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_balance_within_limit;
     ALTER TABLE accounts ADD CONSTRAINT accounts_balance_within_limit
       CHECK (credit_limit IS NULL OR balance <= credit_limit);
+
+    ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_savings_split;
+    ALTER TABLE accounts ADD CONSTRAINT accounts_savings_split
+      CHECK (
+        type <> 'savings'
+        OR (cash_part IS NOT NULL AND bank_part IS NOT NULL
+            AND cash_part >= 0 AND bank_part >= 0
+            AND balance = cash_part + bank_part)
+      );
 
     CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
 
@@ -80,6 +100,7 @@ async function initSchema() {
 
     ALTER TABLE expenses ADD COLUMN IF NOT EXISTS account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
     ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_payment_method_check;
+    ALTER TABLE expenses ADD COLUMN IF NOT EXISTS savings_part TEXT CHECK (savings_part IN ('cash','bank'));
 
     CREATE TABLE IF NOT EXISTS wallet_transfers (
       id BIGSERIAL PRIMARY KEY,
@@ -95,6 +116,8 @@ async function initSchema() {
     );
     ALTER TABLE wallet_transfers ADD COLUMN IF NOT EXISTS from_account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
     ALTER TABLE wallet_transfers ADD COLUMN IF NOT EXISTS to_account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
+    ALTER TABLE wallet_transfers ADD COLUMN IF NOT EXISTS from_part TEXT CHECK (from_part IN ('cash','bank'));
+    ALTER TABLE wallet_transfers ADD COLUMN IF NOT EXISTS to_part TEXT CHECK (to_part IN ('cash','bank'));
 
     CREATE TABLE IF NOT EXISTS budgets (
       id BIGSERIAL PRIMARY KEY,
@@ -140,9 +163,10 @@ async function initSchema() {
     -- type, tied to the account it went into.
     ALTER TABLE balance_log ADD COLUMN IF NOT EXISTS account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
     ALTER TABLE balance_log ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'topup';
+    ALTER TABLE balance_log ADD COLUMN IF NOT EXISTS part TEXT CHECK (part IN ('cash','bank'));
     ALTER TABLE balance_log DROP CONSTRAINT IF EXISTS balance_log_type_check;
     ALTER TABLE balance_log ADD CONSTRAINT balance_log_type_check
-      CHECK (type IN ('cash','online','bank','credit','emi','other'));
+      CHECK (type IN ('cash','online','bank','savings','credit','emi','other'));
     ALTER TABLE balance_log DROP CONSTRAINT IF EXISTS balance_log_kind_check;
     ALTER TABLE balance_log ADD CONSTRAINT balance_log_kind_check
       CHECK (kind IN ('topup','repayment'));
@@ -193,7 +217,45 @@ async function initSchema() {
       AND fa.name IN ('Cash','Online') AND ta.name IN ('Cash','Online');
   `);
 
+  // One-time: fold any existing "savings" accounts into the single
+  // Savings account (Cash + Bank). Runs in its own transaction, so it
+  // either fully applies or leaves the data exactly as it was.
+  await runMigrationOnce('savings_merge_v1', mergeLegacySavings);
+
+  // Exactly one Savings account per user (created after the merge above).
+  await pool.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_one_savings_per_user
+     ON accounts(user_id) WHERE type = 'savings'`
+  );
+
   logger.info('PostgreSQL database initialized.');
+}
+
+async function runMigrationOnce(name, fn) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const claimed = await client.query(
+      `INSERT INTO app_migrations(name) VALUES($1)
+       ON CONFLICT (name) DO NOTHING
+       RETURNING name`,
+      [name]
+    );
+
+    if (claimed.rows.length) {
+      const result = await fn(client);
+      logger.info({ migration: name, ...result }, 'Data migration applied');
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 module.exports = { initSchema };

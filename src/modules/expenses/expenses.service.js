@@ -9,7 +9,7 @@ function toNumberRow(x) {
     return { ...x, amount: Number(x.amount) };
 }
 
-async function addExpense(userId, amount, notes, paymentMethod, category, spentOn, accountId = null) {
+async function addExpense(userId, amount, notes, paymentMethod, category, spentOn, accountId = null, savingsPart = null) {
     return runInTransaction(async client => {
         amount = round2(amount);
 
@@ -33,13 +33,16 @@ async function addExpense(userId, amount, notes, paymentMethod, category, spentO
             aid = await accountsRepo.findFirstAccountByType(userId, paymentMethod, client);
         }
 
-        const debit = await accountsRepo.debitAccount(userId, aid, amount, client);
+        const debit = await accountsRepo.debitAccount(userId, aid, amount, client, savingsPart);
 
         if (!debit) {
             throw new Error('That account does not have enough balance.');
         }
 
-        await repo.insertExpense(userId, amount, notes, debit.type, category, spentOn, aid, client);
+        await repo.insertExpense(
+            userId, amount, notes, debit.type, category, spentOn, aid, client,
+            debit.type === 'savings' ? savingsPart : null
+        );
     });
 }
 
@@ -68,7 +71,9 @@ async function deleteExpense(userId, id) {
             if (account && isCreditType(account.type) && account.credit_limit !== null) {
                 await accountsRepo.creditAccountCapped(userId, aid, Number(row.amount), client);
             } else {
-                await accountsRepo.creditAccountPlain(userId, aid, Number(row.amount), client);
+                // Savings: put it back into the part it was taken from.
+                const part = account && account.type === 'savings' ? (row.savings_part || 'bank') : null;
+                await accountsRepo.creditAccountPlain(userId, aid, Number(row.amount), client, part);
             }
         }
 

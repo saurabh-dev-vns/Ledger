@@ -21,11 +21,16 @@
                             ? 'dot-cash'
                             : a.type === 'online'
                                 ? 'dot-online'
-                                : 'dot-spent' %>"
+                                : a.type === 'savings'
+                                    ? 'dot-savings'
+                                    : 'dot-spent' %>"
                     ></span>
 
                     <%= a.name %>
                     <strong>₹<%= money(a.balance) %></strong>
+                    <% if (a.type === 'savings') { %>
+                        <small class="split-note"><%= savingsSplit(a) %></small>
+                    <% } %>
                 </div>
             <% }) %>
 
@@ -99,7 +104,7 @@
                             </td>
 
                             <td class="col-method">
-                                <%= r.account_name || r.payment_method %>
+                                <%= r.account_name ? withPart(r.account_name, r.savings_part) : r.payment_method %>
                             </td>
 
                             <td class="col-amount">
@@ -286,9 +291,9 @@
         %>
                 <div class="transfer-row">
                     <span>
-                        <%= r.from_name || r.from_type %>
+                        <%= withPart(r.from_name || r.from_type, r.from_part) %>
                         →
-                        <%= r.to_name || r.to_type %>
+                        <%= withPart(r.to_name || r.to_type, r.to_part) %>
                     </span>
 
                     <strong>

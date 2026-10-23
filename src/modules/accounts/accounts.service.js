@@ -1,7 +1,7 @@
 const { runInTransaction } = require('../../core/transaction');
 const { round2 } = require('../../core/money');
 const repo = require('./accounts.repository');
-const { ACCOUNT_TYPES, isCreditType } = require('./accounts.constants');
+const { ACCOUNT_TYPES, isCreditType, isSavingsType, SAVINGS_PARTS, partLabel } = require('./accounts.constants');
 
 function toNumberRow(x) {
     return {
@@ -9,7 +9,9 @@ function toNumberRow(x) {
         balance: Number(x.balance),
         credit_limit: x.credit_limit === null || x.credit_limit === undefined
             ? null
-            : Number(x.credit_limit)
+            : Number(x.credit_limit),
+        cash_part: x.cash_part === null || x.cash_part === undefined ? null : Number(x.cash_part),
+        bank_part: x.bank_part === null || x.bank_part === undefined ? null : Number(x.bank_part)
     };
 }
 
@@ -38,9 +40,13 @@ async function ensureWallet(userId) {
     return repo.ensureAccounts(userId);
 }
 
-async function addAccount(userId, name, type, balance = 0, creditLimit = null) {
+async function addAccount(userId, name, type, balance = 0, creditLimit = null, savingsOpening = {}) {
     return runInTransaction(async client => {
         name = String(name || '').trim();
+
+        if (!name && isSavingsType(type)) {
+            name = 'Savings';
+        }
 
         if (!name) {
             throw new Error('Account name is required.');
@@ -51,6 +57,21 @@ async function addAccount(userId, name, type, balance = 0, creditLimit = null) {
         }
 
         let limit = null;
+
+        if (isSavingsType(type)) {
+            if (await repo.findSavingsAccount(userId, client)) {
+                throw new Error('You already have a Savings account. Add money to its Cash or Bank part instead.');
+            }
+
+            const cash = round2(savingsOpening.cash || 0);
+            const bank = round2(savingsOpening.bank || 0);
+
+            if (cash < 0 || bank < 0) {
+                throw new Error('Opening Cash and Bank amounts cannot be negative.');
+            }
+
+            return repo.insertAccount(userId, name, 'savings', round2(cash + bank), null, client, cash, bank);
+        }
 
         if (isCreditType(type)) {
             limit = round2(creditLimit);
@@ -83,7 +104,7 @@ async function addAccount(userId, name, type, balance = 0, creditLimit = null) {
  * the "extra" (if the person repays more than they owed) isn't applied
  * anywhere since it came from outside the app.
  */
-async function updateAccountBalance(userId, accountId, amount, note) {
+async function updateAccountBalance(userId, accountId, amount, note, part = null) {
     return runInTransaction(async client => {
         amount = round2(amount);
 
@@ -97,12 +118,18 @@ async function updateAccountBalance(userId, accountId, amount, note) {
             throw new Error('Account not found.');
         }
 
+        const savings = isSavingsType(before.type);
+
+        if (savings && !SAVINGS_PARTS.includes(part)) {
+            throw new Error('Choose whether you are adding to Savings Cash or Savings Bank.');
+        }
+
         const startingBalance = Number(before.balance);
         const capped = isCreditType(before.type) && before.credit_limit !== null;
 
         const after = capped
             ? await repo.creditAccountCapped(userId, accountId, amount, client)
-            : await repo.creditAccountPlain(userId, accountId, amount, client);
+            : await repo.creditAccountPlain(userId, accountId, amount, client, part);
 
         const newBalance = Number(after.balance);
         const applied = round2(newBalance - startingBalance);
@@ -121,12 +148,14 @@ async function updateAccountBalance(userId, accountId, amount, note) {
                 logAmount,
                 note,
                 capped ? 'repayment' : 'topup',
-                client
+                client,
+                savings ? part : null
             );
         }
 
         return {
             accountName: before.name,
+            part: savings ? part : null,
             type: after.type,
             balance: newBalance,
             creditLimit: after.credit_limit === null ? null : Number(after.credit_limit),
@@ -170,7 +199,31 @@ async function getAddedThisMonth(userId) {
     return repo.sumBalanceLogSince(userId, monthStart);
 }
 
+/** Shifts money between the Cash and Bank parts of the Savings account. The total does not change. */
+async function moveWithinSavings(userId, accountId, from, amount) {
+    return runInTransaction(async client => {
+        amount = round2(amount);
+
+        if (!(amount > 0)) {
+            throw new Error('Amount must be greater than zero.');
+        }
+
+        if (!SAVINGS_PARTS.includes(from)) {
+            throw new Error('Choose which way to move the money.');
+        }
+
+        const row = await repo.moveWithinSavings(userId, accountId, from, amount, client);
+
+        if (!row) {
+            throw new Error(`Savings ${partLabel(from)} does not have enough to move that much.`);
+        }
+
+        return { amount, from, to: from === 'cash' ? 'bank' : 'cash' };
+    });
+}
+
 module.exports = {
+    moveWithinSavings,
     getFundsAdded,
     getRecentFundsAdded,
     getAddedThisMonth,

@@ -1,6 +1,6 @@
 const pool = require('../../db/pool');
 
-async function insertTransfer(userId, fromType, toType, amount, note, fromAccountId, toAccountId, client = pool) {
+async function insertTransfer(userId, fromType, toType, amount, note, fromAccountId, toAccountId, client = pool, fromPart = null, toPart = null) {
     await client.query(
         `INSERT INTO wallet_transfers(
             user_id,
@@ -9,10 +9,12 @@ async function insertTransfer(userId, fromType, toType, amount, note, fromAccoun
             amount,
             note,
             from_account_id,
-            to_account_id
+            to_account_id,
+            from_part,
+            to_part
         )
-        VALUES($1,$2,$3,$4,$5,$6,$7)`,
-        [userId, fromType, toType, amount, note || null, fromAccountId, toAccountId]
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [userId, fromType, toType, amount, note || null, fromAccountId, toAccountId, fromPart, toPart]
     );
 }
 

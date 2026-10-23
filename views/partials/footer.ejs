@@ -17,5 +17,22 @@
   })();
 </script>
 
+<script>
+  // Show the Cash/Bank chooser only while a Savings account is selected.
+  (() => {
+    document.querySelectorAll('select[data-savings-target]').forEach((sel) => {
+      const wrap = document.getElementById(sel.dataset.savingsTarget);
+      if (!wrap) return;
+      const sync = () => {
+        const on = !!(sel.selectedOptions[0] && sel.selectedOptions[0].dataset.savings === '1');
+        wrap.hidden = !on;
+        wrap.querySelectorAll('select, input').forEach((i) => { i.disabled = !on; i.required = on; });
+      };
+      sel.addEventListener('change', sync);
+      sync();
+    });
+  })();
+</script>
+
 </body>
 </html>

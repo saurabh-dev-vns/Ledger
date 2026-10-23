@@ -44,14 +44,14 @@
             <div class="form-row">
                 <label>
                     Account
-                    <select name="account_id" required>
+                    <select name="account_id" required data-savings-target="expense-part">
                         <% accounts.forEach(a=>{ %>
-                            <option value="<%= a.id %>">
+                            <option value="<%= a.id %>" data-savings="<%= a.type === 'savings' ? 1 : 0 %>">
                                 <%= a.name %> —
                                 <% if (isCreditType(a.type) && a.credit_limit !== null) { %>
                                     ₹<%= money(a.balance) %> available of ₹<%= money(a.credit_limit) %>
                                 <% } else { %>
-                                    ₹<%= money(a.balance) %>
+                                    ₹<%= money(a.balance) %> <%= a.type === 'savings' ? '(' + savingsSplit(a) + ')' : '' %>
                                 <% } %>
                             </option>
                         <% }) %>
@@ -69,6 +69,13 @@
                     </select>
                 </label>
             </div>
+
+            <%- include('partials/savings_part', {
+                id: 'expense-part',
+                name: 'savings_part',
+                label: 'Pay from Savings',
+                savings: accounts.find(a => a.type === 'savings')
+            }) %>
 
             <input
                 type="hidden"
@@ -98,7 +105,10 @@
         <div class="account-list">
             <% accounts.forEach(a=>{ %>
                 <div class="account-item">
-                    <span><%= a.name %></span>
+                    <span>
+                        <%= a.name %>
+                        <% if (a.type === 'savings') { %><small class="split-note"><%= savingsSplit(a) %></small><% } %>
+                    </span>
                     <strong>
                         <% if (isCreditType(a.type) && a.credit_limit !== null) { %>
                             ₹<%= money(a.balance) %> avail.
