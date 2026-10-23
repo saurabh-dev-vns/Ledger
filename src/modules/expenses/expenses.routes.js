@@ -33,7 +33,8 @@ router.post('/add-expense', checkCsrf, async (req, res) => {
             req.body.payment_method,
             req.body.category,
             req.body.spent_on || new Date().toISOString().slice(0, 10),
-            req.body.account_id
+            req.body.account_id,
+            req.body.savings_part || null
         );
 
         setFlash(

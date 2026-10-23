@@ -2,6 +2,7 @@ const ACCOUNT_TYPES = [
     'cash',
     'online',
     'bank',
+    'savings',
     'credit',
     'emi',
     'other'
@@ -13,6 +14,7 @@ const ACCOUNT_TYPE_LABELS = {
     cash: 'Cash',
     online: 'Online / UPI',
     bank: 'Bank',
+    savings: 'Savings (Cash + Bank)',
     credit: 'Credit Card',
     emi: 'EMI / Installment',
     other: 'Other'
@@ -29,7 +31,21 @@ function isCreditType(type) {
     return type === 'credit' || type === 'emi';
 }
 
+/** A Savings account is one account whose balance is split into a Cash part and a Bank part. */
+const SAVINGS_PARTS = ['cash', 'bank'];
+
+function isSavingsType(type) {
+    return type === 'savings';
+}
+
+function partLabel(part) {
+    return part === 'cash' ? 'Cash' : part === 'bank' ? 'Bank' : '';
+}
+
 module.exports = {
+    SAVINGS_PARTS,
+    isSavingsType,
+    partLabel,
     ACCOUNT_TYPES,
     ACCOUNT_TYPE_LABELS,
     accountTypeLabel,

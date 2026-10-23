@@ -84,7 +84,7 @@
 
                             <% } else if(t.kind==='deposit'){ %>
 
-                                Added to <%= t.account_name %>
+                                Added to <%= withPart(t.account_name, t.part) %>
 
                                 <% if(t.note){ %>
                                     <div class="row-note">
@@ -99,9 +99,9 @@
 
                             <% } else { %>
 
-                                <%= t.from_name || t.from_type %>
+                                <%= withPart(t.from_name || t.from_type, t.from_part) %>
                                 →
-                                <%= t.to_name || t.to_type %>
+                                <%= withPart(t.to_name || t.to_type, t.to_part) %>
 
                                 <% if(t.note){ %>
                                     <div class="row-note">
@@ -114,8 +114,8 @@
 
                         <td class="col-method">
                             <%= t.kind==='expense'
-                                ? (t.account_name||t.payment_method)
-                                : t.kind==='deposit' ? t.account_name : '—' %>
+                                ? (t.account_name ? withPart(t.account_name, t.savings_part) : t.payment_method)
+                                : t.kind==='deposit' ? withPart(t.account_name, t.part) : '—' %>
                         </td>
 
                         <td class="col-amount <%= t.kind==='deposit' ? 'amount-in' : '' %>">

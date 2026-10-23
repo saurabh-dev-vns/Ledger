@@ -4,7 +4,7 @@ const accountsRepo = require('../accounts/accounts.repository');
 const { isCreditType } = require('../accounts/accounts.constants');
 const repo = require('./transfers.repository');
 
-async function transfer(userId, fromId, toId, amount, note) {
+async function transfer(userId, fromId, toId, amount, note, fromPart = null, toPart = null) {
     return runInTransaction(async client => {
         amount = round2(amount);
 
@@ -37,13 +37,13 @@ async function transfer(userId, fromId, toId, amount, note) {
             }
         }
 
-        const from = await accountsRepo.debitAccount(userId, fromId, amount, client);
+        const from = await accountsRepo.debitAccount(userId, fromId, amount, client, fromPart);
 
         if (!from) {
             throw new Error('Source account not found or does not have enough balance.');
         }
 
-        const to = await accountsRepo.creditAccountPlain(userId, toId, amount, client);
+        const to = await accountsRepo.creditAccountPlain(userId, toId, amount, client, toPart);
 
         await repo.insertTransfer(
             userId,
@@ -53,7 +53,9 @@ async function transfer(userId, fromId, toId, amount, note) {
             note,
             fromId,
             toId,
-            client
+            client,
+            from.type === 'savings' ? fromPart : null,
+            to.type === 'savings' ? toPart : null
         );
     });
 }

@@ -1,6 +1,6 @@
 const pool = require('../../db/pool');
 
-async function insertExpense(userId, amount, notes, paymentMethod, category, spentOn, accountId, client) {
+async function insertExpense(userId, amount, notes, paymentMethod, category, spentOn, accountId, client, savingsPart = null) {
     await client.query(
         `INSERT INTO expenses(
             user_id,
@@ -9,16 +9,17 @@ async function insertExpense(userId, amount, notes, paymentMethod, category, spe
             payment_method,
             category,
             spent_on,
-            account_id
+            account_id,
+            savings_part
         )
-        VALUES($1,$2,$3,$4,$5,$6,$7)`,
-        [userId, amount, notes || null, paymentMethod, category, spentOn, accountId]
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [userId, amount, notes || null, paymentMethod, category, spentOn, accountId, savingsPart]
     );
 }
 
 async function getExpenseForDelete(userId, id, client) {
     const r = await client.query(
-        `SELECT amount,account_id,payment_method
+        `SELECT amount,account_id,payment_method,savings_part
          FROM expenses
          WHERE id=$1 AND user_id=$2
          FOR UPDATE`,

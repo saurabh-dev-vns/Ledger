@@ -277,6 +277,167 @@ test('transaction feed includes funds added as deposits', async () => {
     assert.match(deposit.date, /^\d{4}-\d{2}-\d{2}$/);
 });
 
+// ---------------------------------------------------------------
+// Savings account (Cash + Bank)
+// ---------------------------------------------------------------
+
+test('savings: one account keeps separate cash and bank amounts', async () => {
+    const u = await authService.register({ name: 'Sav User', email: `sav${Date.now()}@example.com`, password: 'password1', confirm: 'password1' });
+    const id = await accountsService.addAccount(u.id, '', 'savings', 0, null, { cash: 1000, bank: 4000 });
+
+    let sav = (await accountsService.getAccounts(u.id)).find(a => a.type === 'savings');
+    assert.equal(sav.id, id);
+    assert.equal(sav.name, 'Savings');
+    assert.equal(sav.cash_part, 1000);
+    assert.equal(sav.bank_part, 4000);
+    assert.equal(sav.balance, 5000);
+
+    // Only one Savings account is allowed.
+    await assert.rejects(() => accountsService.addAccount(u.id, 'Savings 2', 'savings', 0, null, {}), /already have a Savings/);
+
+    // Adding must say which part; the chosen part grows, the total follows.
+    await assert.rejects(() => accountsService.updateAccountBalance(u.id, id, 100, null), /Cash or Savings Bank/);
+    await accountsService.updateAccountBalance(u.id, id, 250, 'gift', 'cash');
+    await accountsService.updateAccountBalance(u.id, id, 500, 'salary', 'bank');
+
+    sav = (await accountsService.getAccounts(u.id)).find(a => a.type === 'savings');
+    assert.deepEqual([sav.cash_part, sav.bank_part, sav.balance], [1250, 4500, 5750]);
+
+    // The funds-added history records which part.
+    const hist = await accountsService.getFundsAdded(u.id, { accountId: id });
+    assert.deepEqual(hist.rows.map(r => r.part).sort(), ['bank', 'cash']);
+});
+
+test('savings: expenses and transfers draw from the chosen part and can be undone', async () => {
+    const u = await authService.register({ name: 'Sav2', email: `sav2${Date.now()}@example.com`, password: 'password1', confirm: 'password1' });
+    const id = await accountsService.addAccount(u.id, 'Savings', 'savings', 0, null, { cash: 300, bank: 700 });
+    const get = async () => (await accountsService.getAccounts(u.id)).find(a => a.type === 'savings');
+
+    // Cash part is only 300: a 400 cash expense is refused, nothing changes.
+    await assert.rejects(
+        () => expensesService.addExpense(u.id, 400, 'x', 'savings', 'Transport', '2026-02-01', id, 'cash'),
+        /enough balance/
+    );
+    // ...and a missing part is refused too.
+    await assert.rejects(
+        () => expensesService.addExpense(u.id, 10, 'x', 'savings', 'Transport', '2026-02-01', id, null),
+        /Savings Cash or Savings Bank/
+    );
+
+    await expensesService.addExpense(u.id, 200, 'bus', 'savings', 'Transport', '2026-02-01', id, 'cash');
+    let sav = await get();
+    assert.deepEqual([sav.cash_part, sav.bank_part, sav.balance], [100, 700, 800]);
+
+    // Deleting that expense puts the money back into Cash, not Bank.
+    const [exp] = await expensesService.getAllExpenses(u.id, {});
+    await expensesService.deleteExpense(u.id, exp.id);
+    sav = await get();
+    assert.deepEqual([sav.cash_part, sav.bank_part], [300, 700]);
+
+    // Transfer Savings(bank) -> Cash account, and Cash account -> Savings(cash).
+    const accounts = await accountsService.getAccounts(u.id);
+    const cash = accounts.find(a => a.name === 'Cash');
+    await transfersService.transfer(u.id, id, cash.id, 150, null, 'bank', null);
+    await transfersService.transfer(u.id, cash.id, id, 50, null, null, 'cash');
+    sav = await get();
+    assert.deepEqual([sav.cash_part, sav.bank_part, sav.balance], [350, 550, 900]);
+
+    const feed = await transactionsService.getTransactionFeed(u.id, {});
+    assert.ok(feed.some(f => f.kind === 'transfer' && f.from_part === 'bank'));
+});
+
+test('savings: move money between cash and bank keeps the total', async () => {
+    const u = await authService.register({ name: 'Sav3', email: `sav3${Date.now()}@example.com`, password: 'password1', confirm: 'password1' });
+    const id = await accountsService.addAccount(u.id, 'Savings', 'savings', 0, null, { cash: 100, bank: 900 });
+
+    await accountsService.moveWithinSavings(u.id, id, 'bank', 400);
+    let sav = (await accountsService.getAccounts(u.id)).find(a => a.type === 'savings');
+    assert.deepEqual([sav.cash_part, sav.bank_part, sav.balance], [500, 500, 1000]);
+
+    await assert.rejects(() => accountsService.moveWithinSavings(u.id, id, 'cash', 501), /does not have enough/);
+    sav = (await accountsService.getAccounts(u.id)).find(a => a.type === 'savings');
+    assert.deepEqual([sav.cash_part, sav.bank_part], [500, 500]);
+});
+
+test('migration: old savings accounts merge into one Savings, history kept, old accounts deleted', async () => {
+    const pool = require('../src/db/pool');
+    const { mergeLegacySavings } = require('../src/db/savings-merge');
+
+    const u = await authService.register({ name: 'Legacy', email: `legacy${Date.now()}@example.com`, password: 'password1', confirm: 'password1' });
+    // Another user's accounts must never be touched.
+    const other = await authService.register({ name: 'Other', email: `other${Date.now()}@example.com`, password: 'password1', confirm: 'password1' });
+    await accountsService.addAccount(other.id, 'Savings', 'bank', 777, null);
+
+    const sCash = await accountsService.addAccount(u.id, 'Savings Cash', 'cash', 1000, null);
+    const sBank = await accountsService.addAccount(u.id, 'Savings Bank', 'bank', 5000, null);
+    const sMain = await accountsService.addAccount(u.id, 'Savings', 'other', 300, null);
+    const keep  = await accountsService.addAccount(u.id, 'HDFC Salary', 'bank', 2500, null);
+
+    // history that references the old accounts
+    await expensesService.addExpense(u.id, 100, 'from savings cash', 'cash', 'Groceries', '2026-03-01', sCash);
+    await expensesService.addExpense(u.id, 50, 'from savings bank', 'bank', 'Groceries', '2026-03-02', sBank);
+    await transfersService.transfer(u.id, sBank, keep, 400, 'to salary acct');
+    await accountsService.updateAccountBalance(u.id, sCash, 25, 'old topup');
+
+    const before = (await accountsService.getAccounts(u.id)).reduce((t, a) => t + a.balance, 0);
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const r = await mergeLegacySavings(client);
+        await client.query('COMMIT');
+        assert.ok(r.accounts >= 3);
+    } finally {
+        client.release();
+    }
+
+    const accounts = await accountsService.getAccounts(u.id);
+    const savings = accounts.filter(a => a.type === 'savings');
+
+    assert.equal(savings.length, 1, 'exactly one Savings account');
+    assert.equal(savings[0].id, sMain, 'the account literally named Savings survives');
+    // cash: 1000 - 100 + 25 = 925 ; bank: 5000 - 50 - 400 = 4550 + the "other" 300
+    assert.equal(savings[0].cash_part, 925);
+    assert.equal(savings[0].bank_part, 4850);
+    assert.equal(savings[0].balance, 5775);
+
+    assert.ok(!accounts.some(a => a.id === sCash || a.id === sBank), 'old accounts deleted');
+    assert.ok(accounts.some(a => a.id === keep && a.balance === 2900), 'unrelated account untouched');
+
+    // total money across all accounts is unchanged
+    const after = accounts.reduce((t, a) => t + a.balance, 0);
+    assert.equal(after, before);
+
+    // other user untouched
+    const o = (await accountsService.getAccounts(other.id)).find(a => a.name === 'Savings');
+    assert.equal(o.type, 'savings');
+    assert.equal(o.balance, 777);
+
+    // history re-pointed, not lost
+    const expenses = await expensesService.getAllExpenses(u.id, {});
+    const e1 = expenses.find(e => e.notes === 'from savings cash');
+    const e2 = expenses.find(e => e.notes === 'from savings bank');
+    assert.equal(e1.account_id, sMain); assert.equal(e1.savings_part, 'cash');
+    assert.equal(e2.account_id, sMain); assert.equal(e2.savings_part, 'bank');
+
+    const feed = await transactionsService.getTransactionFeed(u.id, {});
+    const tr = feed.find(f => f.kind === 'transfer' && f.note === 'to salary acct');
+    assert.equal(tr.from_account_id, sMain);
+    assert.equal(tr.from_part, 'bank');
+
+    const added = await accountsService.getFundsAdded(u.id, { accountId: sMain });
+    assert.equal(added.rows[0].part, 'cash');
+
+    // running it again changes nothing
+    const c2 = await pool.connect();
+    try {
+        await c2.query('BEGIN');
+        const again = await mergeLegacySavings(c2);
+        await c2.query('COMMIT');
+        assert.equal(again.accounts, 0);
+    } finally { c2.release(); }
+});
+
 test('profile: update name and email', async () => {
     const profileService = require('../src/modules/profile/profile.service');
     const newEmail = `updated-${Date.now()}@example.com`;

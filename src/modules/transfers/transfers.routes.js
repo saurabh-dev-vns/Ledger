@@ -26,7 +26,9 @@ router.post('/swap-balance', checkCsrf, async (req, res) => {
             req.body.from_account_id,
             req.body.to_account_id,
             parseFloat(req.body.amount),
-            (req.body.note || '').trim() || null
+            (req.body.note || '').trim() || null,
+            req.body.from_part || null,
+            req.body.to_part || null
         );
 
         setFlash(req, 'Money transferred successfully.', 'success');

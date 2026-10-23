@@ -2,7 +2,7 @@ const express = require('express');
 const { checkCsrf, setFlash } = require('../../middleware/session');
 const { money, formatDate } = require('../../core/money');
 const service = require('./accounts.service');
-const { ACCOUNT_TYPES, accountTypeLabel, isCreditType } = require('./accounts.constants');
+const { ACCOUNT_TYPES, accountTypeLabel, isCreditType, partLabel } = require('./accounts.constants');
 
 const router = express.Router();
 
@@ -49,10 +49,12 @@ router.post('/add-balance', checkCsrf, async (req, res) => {
             req.session.userId,
             req.body.account_id,
             parseFloat(req.body.amount),
-            (req.body.note || '').trim() || null
+            (req.body.note || '').trim() || null,
+            req.body.part || null
         );
 
-        setFlash(req, `₹${money(result.applied)} added to ${result.accountName}.`, 'success');
+        const where = result.part ? `${result.accountName} (${partLabel(result.part)})` : result.accountName;
+        setFlash(req, `₹${money(result.applied)} added to ${where}.`, 'success');
     } catch (e) {
         setFlash(req, e.message);
     }
@@ -82,7 +84,11 @@ router.post('/accounts', checkCsrf, async (req, res) => {
             req.body.name,
             req.body.type,
             parseFloat(req.body.balance || 0),
-            req.body.credit_limit ? parseFloat(req.body.credit_limit) : null
+            req.body.credit_limit ? parseFloat(req.body.credit_limit) : null,
+            {
+                cash: parseFloat(req.body.cash_opening || 0),
+                bank: parseFloat(req.body.bank_opening || 0)
+            }
         );
 
         setFlash(req, 'Account created.', 'success');
@@ -99,10 +105,13 @@ router.post('/accounts/:id/add', checkCsrf, async (req, res) => {
             req.session.userId,
             req.params.id,
             parseFloat(req.body.amount),
-            (req.body.note || '').trim() || null
+            (req.body.note || '').trim() || null,
+            req.body.part || null
         );
 
-        if (isCreditType(result.type) && result.creditLimit !== null) {
+        if (result.part) {
+            setFlash(req, `₹${money(result.applied)} added to Savings (${partLabel(result.part)}).`, 'success');
+        } else if (isCreditType(result.type) && result.creditLimit !== null) {
             if (result.applied < result.requested) {
                 setFlash(
                     req,
@@ -115,6 +124,24 @@ router.post('/accounts/:id/add', checkCsrf, async (req, res) => {
         } else {
             setFlash(req, 'Balance added.', 'success');
         }
+    } catch (e) {
+        setFlash(req, e.message);
+    }
+
+    res.redirect('/accounts');
+});
+
+/** Move money between the Cash and Bank parts of Savings (total stays the same). */
+router.post('/accounts/:id/move', checkCsrf, async (req, res) => {
+    try {
+        const r = await service.moveWithinSavings(
+            req.session.userId,
+            req.params.id,
+            req.body.from,
+            parseFloat(req.body.amount)
+        );
+
+        setFlash(req, `Moved ₹${money(r.amount)} from Savings ${partLabel(r.from)} to ${partLabel(r.to)}.`, 'success');
     } catch (e) {
         setFlash(req, e.message);
     }

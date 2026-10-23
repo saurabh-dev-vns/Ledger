@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../db/pool');
-const { formatDateTime } = require('../core/money');
+const { formatDateTime, money } = require('../core/money');
 
 async function findSessionUser(req) {
   if (!req.session.userId) return null;
@@ -62,6 +62,16 @@ function locals(req, res, next) {
   }
   res.locals.csrfToken = req.session.csrfToken;
   res.locals.formatDateTime = formatDateTime;
+
+  // "Savings (Cash)" for rows that touched one part of the Savings account.
+  res.locals.withPart = (name, part) =>
+    part ? `${name} (${part === 'cash' ? 'Cash' : 'Bank'})` : name;
+
+  // " · Cash ₹x · Bank ₹y" suffix for the Savings account, empty for others.
+  res.locals.savingsSplit = (a) =>
+    a && a.type === 'savings'
+      ? `Cash ₹${money(a.cash_part)} · Bank ₹${money(a.bank_part)}`
+      : '';
 
   next();
 }

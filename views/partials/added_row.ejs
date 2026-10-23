@@ -3,7 +3,7 @@
 
     <div class="added-main">
         <div class="added-title">
-            Added to <span class="cat-tag"><%= row.account_name %></span>
+            Added to <span class="cat-tag"><%= withPart(row.account_name, row.part) %></span>
             <% if (row.kind === 'repayment') { %>
                 <span class="pill">Repayment</span>
             <% } %>

@@ -114,7 +114,7 @@
                         </td>
 
                         <td class="col-method">
-                            <%= row.account_name || (isImported ? 'Imported (no account)' : row.payment_method) %>
+                            <%= row.account_name ? withPart(row.account_name, row.savings_part) : (isImported ? 'Imported (no account)' : row.payment_method) %>
                         </td>
 
                         <td class="col-amount">

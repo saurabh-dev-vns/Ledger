@@ -6,6 +6,17 @@ Ledger is a personal finance app built with **Node.js, Express, and PostgreSQL**
 
 ---
 
+## 🏦 Savings account (Cash + Bank)
+
+Savings is a **single account** that keeps two parts: **Cash** and **Bank**. Its total is always the sum of the two.
+
+- **Add money** → pick Cash or Bank (Accounts, Add balance). The Funds added history records which part.
+- **Spend / transfer** → when the account is Savings you choose which part the money comes from (or goes into).
+- **Move** → shift money between Cash and Bank inside Savings; your total does not change.
+- Only one Savings account per user.
+
+**Upgrading an existing database:** on the first start after this update, the app automatically merges any accounts whose name contains "saving" (types Cash / Online / Bank / Other, e.g. "Savings", "Savings Cash", "Savings Bank") into the one Savings account, in a single all-or-nothing transaction. Balances are summed (name or type says "cash" → Cash part, everything else → Bank part), every expense / transfer / funds-added record is re-pointed to the new account (nothing is lost), and only then are the old accounts deleted. It runs once (tracked in the `app_migrations` table). If the Cash/Bank split comes out wrong, use **Move** on the Accounts page to correct it. Take a backup first: `pg_dump "$DATABASE_URL" > ledger-backup.sql`.
+
 ## ✨ What Can It Do?
 
 | Feature | What you get |

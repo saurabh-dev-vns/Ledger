@@ -20,14 +20,21 @@
 
             <label>
                 Account
-                <select name="account_id" required>
+                <select name="account_id" required data-savings-target="balance-part">
                     <% accounts.forEach(a=>{ %>
-                        <option value="<%=a.id%>">
-                            <%=a.name%> — ₹<%=money(a.balance)%>
+                        <option value="<%=a.id%>" data-savings="<%= a.type === 'savings' ? 1 : 0 %>">
+                            <%=a.name%> — ₹<%=money(a.balance)%> <%= a.type === 'savings' ? '(' + savingsSplit(a) + ')' : '' %>
                         </option>
                     <% }) %>
                 </select>
             </label>
+
+            <%- include('partials/savings_part', {
+                id: 'balance-part',
+                name: 'part',
+                label: 'Add to',
+                savings: accounts.find(a => a.type === 'savings')
+            }) %>
 
             <label>
                 Amount (₹)
@@ -61,7 +68,10 @@
 
         <% accounts.forEach(a=>{ %>
             <div class="balance-row">
-                <span><%=a.name%></span>
+                <span>
+                    <%=a.name%>
+                    <% if (a.type === 'savings') { %><small class="split-note"><%= savingsSplit(a) %></small><% } %>
+                </span>
                 <span class="balance-figure">
                     ₹<%=money(a.balance)%>
                 </span>

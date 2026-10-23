@@ -1,0 +1,9 @@
+<%# Cash/Bank chooser for the Savings account. Hidden until a Savings account is selected (see footer script).
+    locals: id, name, label, savings (the user's savings account or undefined) %>
+<label class="part-picker" id="<%= id %>" hidden>
+    <%= label %>
+    <select name="<%= name %>" disabled>
+        <option value="cash">Cash<%= savings ? ' — ₹' + money(savings.cash_part) : '' %></option>
+        <option value="bank">Bank<%= savings ? ' — ₹' + money(savings.bank_part) : '' %></option>
+    </select>
+</label>
