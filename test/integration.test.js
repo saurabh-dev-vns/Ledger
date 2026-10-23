@@ -438,6 +438,59 @@ test('migration: old savings accounts merge into one Savings, history kept, old 
     } finally { c2.release(); }
 });
 
+test('reports: Excel export contains summary, categories and expenses with numeric amounts', async () => {
+    const ExcelJS = require('exceljs');
+    const { buildReportWorkbook } = require('../src/modules/reports/reports.export');
+    const { getMonthRange } = require('../src/core/dates');
+
+    const u = await authService.register({ name: 'Xl', email: `xl${Date.now()}@example.com`, password: 'password1', confirm: 'password1' });
+    const cash = (await accountsService.getAccounts(u.id)).find(a => a.name === 'Cash');
+    await accountsService.updateAccountBalance(u.id, cash.id, 5000, null);
+
+    await expensesService.addExpense(u.id, 120.5, '=SUM(1+1)', 'cash', 'Groceries', '2026-04-03', cash.id);
+    await expensesService.addExpense(u.id, 80, 'bus', 'cash', 'Transport', '2026-04-01', cash.id);
+    await expensesService.addExpense(u.id, 30, 'other month', 'cash', 'Transport', '2026-05-01', cash.id);
+
+    const month = '2026-04';
+    const wb = await buildReportWorkbook({
+        month,
+        total: await expensesService.getMonthTotal(u.id, month),
+        categories: await expensesService.getCategoryBreakdown(u.id, month),
+        expenses: await expensesService.getAllExpenses(u.id, getMonthRange(month))
+    });
+
+    // round-trip through a real .xlsx file
+    const buf = await wb.xlsx.writeBuffer();
+    const read = new ExcelJS.Workbook();
+    await read.xlsx.load(buf);
+
+    assert.deepEqual(read.worksheets.map(w => w.name), ['Summary', 'Categories', 'Expenses']);
+
+    const exp = read.getWorksheet('Expenses');
+    // header + 2 April expenses + total row; the May expense is excluded
+    assert.equal(exp.rowCount, 4);
+    assert.equal(exp.getRow(2).getCell(2).value, 'Transport');   // oldest first
+    assert.equal(exp.getRow(2).getCell(5).value, 80);
+    assert.equal(typeof exp.getRow(3).getCell(5).value, 'number');
+    assert.equal(exp.getRow(3).getCell(3).value, 'Cash');
+    assert.ok(exp.getRow(3).getCell(1).value instanceof Date);
+
+    // a note that looks like a formula stays plain text
+    assert.equal(exp.getRow(3).getCell(4).value, '=SUM(1+1)');
+    assert.equal(exp.getRow(4).getCell(5).value.formula, 'SUM(E2:E3)');
+
+    const cats = read.getWorksheet('Categories');
+    assert.equal(cats.getRow(2).getCell(1).value, 'Groceries');
+    assert.equal(cats.getRow(2).getCell(2).value, 120.5);
+
+    const summary = read.getWorksheet('Summary');
+    assert.equal(summary.getRow(4).getCell(2).value, 200.5);
+
+    // an empty month still produces a valid workbook
+    const empty = await buildReportWorkbook({ month: '2026-01', total: 0, categories: [], expenses: [] });
+    assert.ok((await empty.xlsx.writeBuffer()).length > 0);
+});
+
 test('profile: update name and email', async () => {
     const profileService = require('../src/modules/profile/profile.service');
     const newEmail = `updated-${Date.now()}@example.com`;

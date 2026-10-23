@@ -22,6 +22,11 @@
         <button class="btn btn-primary">
             Generate report
         </button>
+
+        <%# Submits the same month field to the export route, so the file matches what's selected. %>
+        <button class="btn btn-secondary" type="submit" formaction="/reports/export">
+            ⬇ Download Excel
+        </button>
     </form>
 </div>
 
