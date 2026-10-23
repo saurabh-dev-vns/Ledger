@@ -209,6 +209,74 @@ test('transaction feed combines expenses and transfers', async () => {
     assert.ok(feed.some(f => f.kind === 'transfer'), 'feed should include at least one transfer');
 });
 
+test('every top-up is logged with its account, amount, note and time', async () => {
+    const accounts = await accountsService.getAccounts(user.id);
+    const cash = accounts.find(a => a.name === 'Cash');
+
+    await accountsService.updateAccountBalance(user.id, cash.id, 250.5, 'pocket money');
+
+    const history = await accountsService.getFundsAdded(user.id);
+    const entry = history.rows.find(r => r.note === 'pocket money');
+
+    assert.ok(entry, 'the top-up should appear in the funds-added history');
+    assert.equal(entry.account_name, 'Cash');
+    assert.equal(entry.amount, 250.5);
+    assert.equal(entry.kind, 'topup');
+    assert.ok(entry.created_at instanceof Date, 'entry should carry a timestamp');
+    assert.ok(history.total >= 250.5);
+    assert.ok(history.byAccount.some(a => a.name === 'Cash'));
+});
+
+test('funds-added history can be filtered by account and date', async () => {
+    const accounts = await accountsService.getAccounts(user.id);
+    const online = accounts.find(a => a.name === 'Online');
+
+    await accountsService.updateAccountBalance(user.id, online.id, 40, 'filter-check');
+
+    const onlyOnline = await accountsService.getFundsAdded(user.id, { accountId: online.id });
+    assert.ok(onlyOnline.rows.length > 0);
+    assert.ok(onlyOnline.rows.every(r => r.account_name === 'Online'));
+
+    const future = await accountsService.getFundsAdded(user.id, { from: '2999-01-01' });
+    assert.equal(future.rows.length, 0);
+});
+
+test('adding to a Bank account is logged too (not just Cash/Online)', async () => {
+    const bankId = await accountsService.addAccount(user.id, 'Log Bank', 'bank', 0, null);
+    await accountsService.updateAccountBalance(user.id, bankId, 1200, 'salary');
+
+    const history = await accountsService.getFundsAdded(user.id, { accountId: bankId });
+    assert.equal(history.rows.length, 1);
+    assert.equal(history.rows[0].account_name, 'Log Bank');
+});
+
+test('card repayment logs only what was actually applied, as a repayment', async () => {
+    const ccId = await accountsService.addAccount(user.id, 'Log Card', 'credit', 0, 5000);
+
+    // Nothing owed yet: repaying changes nothing, so nothing is logged.
+    await accountsService.updateAccountBalance(user.id, ccId, 100, 'nothing owed');
+    let history = await accountsService.getFundsAdded(user.id, { accountId: ccId });
+    assert.equal(history.rows.length, 0);
+
+    await expensesService.addExpense(user.id, 800, 'card spend', 'credit', 'Shopping', '2026-01-20', ccId);
+
+    // Repay more than owed (₹800): only the ₹800 actually applied is logged.
+    await accountsService.updateAccountBalance(user.id, ccId, 1000, 'card bill');
+    history = await accountsService.getFundsAdded(user.id, { accountId: ccId });
+
+    assert.equal(history.rows.length, 1);
+    assert.equal(history.rows[0].amount, 800);
+    assert.equal(history.rows[0].kind, 'repayment');
+});
+
+test('transaction feed includes funds added as deposits', async () => {
+    const feed = await transactionsService.getTransactionFeed(user.id, {});
+    const deposit = feed.find(f => f.kind === 'deposit');
+
+    assert.ok(deposit, 'feed should include funds added');
+    assert.match(deposit.date, /^\d{4}-\d{2}-\d{2}$/);
+});
+
 test('profile: update name and email', async () => {
     const profileService = require('../src/modules/profile/profile.service');
     const newEmail = `updated-${Date.now()}@example.com`;

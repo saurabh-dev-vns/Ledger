@@ -36,6 +36,13 @@ async function initSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS session (
+      sid VARCHAR NOT NULL PRIMARY KEY,
+      sess JSON NOT NULL,
+      expire TIMESTAMP(6) NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_session_expire ON session(expire);
+
     CREATE TABLE IF NOT EXISTS accounts (
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -129,6 +136,18 @@ async function initSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    -- "Funds added" history: every top-up / repayment, for every account
+    -- type, tied to the account it went into.
+    ALTER TABLE balance_log ADD COLUMN IF NOT EXISTS account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
+    ALTER TABLE balance_log ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'topup';
+    ALTER TABLE balance_log DROP CONSTRAINT IF EXISTS balance_log_type_check;
+    ALTER TABLE balance_log ADD CONSTRAINT balance_log_type_check
+      CHECK (type IN ('cash','online','bank','credit','emi','other'));
+    ALTER TABLE balance_log DROP CONSTRAINT IF EXISTS balance_log_kind_check;
+    ALTER TABLE balance_log ADD CONSTRAINT balance_log_kind_check
+      CHECK (kind IN ('topup','repayment'));
+    CREATE INDEX IF NOT EXISTS idx_balance_log_account ON balance_log(account_id);
+
     CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, spent_on);
     CREATE INDEX IF NOT EXISTS idx_balance_log_user_date ON balance_log(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_wallet_transfers_user_date ON wallet_transfers(user_id, created_at);
@@ -152,6 +171,14 @@ async function initSchema() {
     WHERE e.account_id IS NULL
       AND a.user_id=e.user_id
       AND LOWER(a.type)=LOWER(e.payment_method)
+      AND a.name IN ('Cash','Online');
+
+    -- Older rows only knew "cash" or "online": attach them to the default accounts.
+    UPDATE balance_log bl SET account_id = a.id
+    FROM accounts a
+    WHERE bl.account_id IS NULL
+      AND a.user_id = bl.user_id
+      AND a.type = bl.type
       AND a.name IN ('Cash','Online');
 
     UPDATE wallet_transfers wt SET

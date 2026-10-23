@@ -1,3 +1,21 @@
 </main>
+
+<script>
+  // Show every <time class="js-time"> in the viewer's own timezone.
+  // The server renders UTC as a fallback for when JavaScript is off.
+  (() => {
+    const fmt = new Intl.DateTimeFormat(undefined, {
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: 'numeric', minute: '2-digit'
+    });
+    document.querySelectorAll('time.js-time').forEach((el) => {
+      const d = new Date(el.getAttribute('datetime'));
+      if (isNaN(d)) return;
+      el.textContent = fmt.format(d);
+      el.title = d.toString();
+    });
+  })();
+</script>
+
 </body>
 </html>

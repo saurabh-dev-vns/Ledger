@@ -1,0 +1,23 @@
+<div class="added-item">
+    <span class="added-icon" aria-hidden="true">+</span>
+
+    <div class="added-main">
+        <div class="added-title">
+            Added to <span class="cat-tag"><%= row.account_name %></span>
+            <% if (row.kind === 'repayment') { %>
+                <span class="pill">Repayment</span>
+            <% } %>
+        </div>
+
+        <% if (row.note) { %>
+            <div class="row-note"><%= row.note %></div>
+        <% } %>
+
+        <time
+            class="added-when js-time"
+            datetime="<%= new Date(row.created_at).toISOString() %>"
+        ><%= formatDateTime(row.created_at) %></time>
+    </div>
+
+    <strong class="added-amount">+₹<%= money(row.amount) %></strong>
+</div>

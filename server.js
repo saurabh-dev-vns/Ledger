@@ -4,7 +4,6 @@ const { initSchema } = require('./src/db/schema');
 const { createApp } = require('./src/app');
 const { startAccountPurgeScheduler } = require('./src/jobs/purge-deleted-accounts');
 const logger = require('./src/core/logger');
-const redisClient = require('./src/db/redis');
 
 // ---------------------------------------------------------------------------
 // Global error safety net
@@ -32,12 +31,11 @@ process.on('uncaughtException', (err) => {
 // Closes all open connections cleanly before the process exits.
 // Triggered by: Ctrl+C in dev, SIGTERM from the OS/Docker/Render on deploys.
 // Without this, in-flight requests get dropped, Postgres connections leak,
-// and Redis may not flush its write-behind buffer.
+// and the session store can be left holding stale connections.
 async function shutdown(signal) {
   logger.info({ signal }, 'Shutdown signal received — closing connections');
   try {
     await pool.end();
-    await redisClient.quit();
     logger.info('All connections closed. Goodbye.');
     process.exit(0);
   } catch (err) {
@@ -59,9 +57,6 @@ async function start() {
     await pool.query('SELECT 1');
     logger.info('PostgreSQL database initialized.');
 
-    // Redis v4+ requires an explicit connect() before any commands.
-    await redisClient.connect();
-
     const app = createApp();
 
     app.listen(env.port, () => {
@@ -72,7 +67,6 @@ async function start() {
   } catch (err) {
     logger.fatal({ err }, 'Failed to start application');
     await pool.end().catch(() => {});
-    await redisClient.quit().catch(() => {});
     process.exit(1);
   }
 }

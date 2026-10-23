@@ -4,7 +4,7 @@
     <p class="eyebrow">Ledger</p>
     <h1>Transactions</h1>
     <p class="sub">
-        Expenses and account transfers in one timeline.
+        Expenses, transfers and money added in one timeline.
     </p>
 </div>
 
@@ -67,7 +67,7 @@
 
                         <td>
                             <span class="cat-tag">
-                                <%= t.kind==='expense'?'Expense':'Transfer' %>
+                                <%= t.kind==='expense' ? 'Expense' : t.kind==='deposit' ? 'Added' : 'Transfer' %>
                             </span>
                         </td>
 
@@ -81,6 +81,21 @@
                                         <%= t.notes %>
                                     </div>
                                 <% } %>
+
+                            <% } else if(t.kind==='deposit'){ %>
+
+                                Added to <%= t.account_name %>
+
+                                <% if(t.note){ %>
+                                    <div class="row-note">
+                                        <%= t.note %>
+                                    </div>
+                                <% } %>
+
+                                <time
+                                    class="added-when js-time"
+                                    datetime="<%= new Date(t.created_at).toISOString() %>"
+                                ><%= formatDateTime(t.created_at) %></time>
 
                             <% } else { %>
 
@@ -100,11 +115,11 @@
                         <td class="col-method">
                             <%= t.kind==='expense'
                                 ? (t.account_name||t.payment_method)
-                                : '—' %>
+                                : t.kind==='deposit' ? t.account_name : '—' %>
                         </td>
 
-                        <td class="col-amount">
-                            <%= t.kind==='expense'?'−':'↔' %>
+                        <td class="col-amount <%= t.kind==='deposit' ? 'amount-in' : '' %>">
+                            <%= t.kind==='expense' ? '−' : t.kind==='deposit' ? '+' : '↔' %>
                             ₹<%= money(t.amount) %>
                         </td>
                     </tr>

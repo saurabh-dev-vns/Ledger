@@ -1,0 +1,106 @@
+<%- include('partials/header') %>
+
+<div class="page-head">
+    <p class="eyebrow">Money</p>
+    <h1>Funds added</h1>
+    <p class="sub">Every amount you've added — when it went in and which account it went to.</p>
+</div>
+
+<div class="stat-strip">
+    <div class="stat">
+        <span class="stat-label">Total added</span>
+        <span class="stat-figure stat-positive">+₹<%= money(history.total) %></span>
+    </div>
+
+    <div class="stat">
+        <span class="stat-label">Additions</span>
+        <span class="stat-figure"><%= history.count %></span>
+    </div>
+
+    <div class="stat">
+        <span class="stat-label">Most added to</span>
+        <span class="stat-figure stat-text">
+            <%= history.byAccount.length ? history.byAccount[0].name : '—' %>
+        </span>
+    </div>
+</div>
+
+<div class="card">
+    <form method="GET" action="/funds-added" class="filter-form">
+        <label>
+            From
+            <input type="date" name="from" value="<%= filters.from %>">
+        </label>
+
+        <label>
+            To
+            <input type="date" name="to" value="<%= filters.to %>">
+        </label>
+
+        <label>
+            Account
+            <select name="account">
+                <option value="">All accounts</option>
+                <% accounts.forEach(a => { %>
+                    <option
+                        value="<%= a.id %>"
+                        <%= String(filters.accountId) === String(a.id) ? 'selected' : '' %>
+                    ><%= a.name %></option>
+                <% }) %>
+            </select>
+        </label>
+
+        <button class="btn btn-secondary">Filter</button>
+        <a href="/funds-added" class="btn btn-secondary">Clear</a>
+        <a href="/add-balance" class="btn btn-primary">Add balance</a>
+    </form>
+</div>
+
+<div class="grid-2 grid-sidebar">
+
+    <div class="card">
+        <div class="card-head">
+            <h2>History</h2>
+        </div>
+
+        <% if (!history.rows.length) { %>
+            <p class="empty">
+                Nothing added<%= (filters.from || filters.to || filters.accountId) ? ' for these filters' : ' yet' %>.
+            </p>
+        <% } else { %>
+            <div class="added-list">
+                <% history.rows.forEach(row => { %>
+                    <%- include('partials/added_row', { row }) %>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
+
+    <div class="card">
+        <h2>By account</h2>
+
+        <% if (!history.byAccount.length) { %>
+            <p class="empty">No additions to summarise.</p>
+        <% } else {
+            const top = history.byAccount[0].total || 1;
+            history.byAccount.forEach(a => {
+        %>
+            <div class="budget-mini">
+                <div class="bar-item-head">
+                    <span><%= a.name %> <small>· <%= a.count %>×</small></span>
+                    <span>₹<%= money(a.total) %></span>
+                </div>
+
+                <div class="bar-track">
+                    <div
+                        class="bar-fill bar-added"
+                        style="width:<%= Math.round(a.total / top * 100) %>%"
+                    ></div>
+                </div>
+            </div>
+        <% }) } %>
+    </div>
+
+</div>
+
+<%- include('partials/footer') %>

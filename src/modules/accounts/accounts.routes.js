@@ -1,6 +1,6 @@
 const express = require('express');
 const { checkCsrf, setFlash } = require('../../middleware/session');
-const { money } = require('../../core/money');
+const { money, formatDate } = require('../../core/money');
 const service = require('./accounts.service');
 const { ACCOUNT_TYPES, accountTypeLabel, isCreditType } = require('./accounts.constants');
 
@@ -12,7 +12,31 @@ router.get('/add-balance', async (req, res, next) => {
             pageTitle: 'Add balance',
             wallet: await service.getWallet(req.session.userId),
             accounts: await service.getAccounts(req.session.userId),
+            recentAdded: await service.getRecentFundsAdded(req.session.userId, 6),
             money
+        });
+    } catch (e) {
+        next(e);
+    }
+});
+
+/** History of every amount added: when it went in, which account, how much, and the note. */
+router.get('/funds-added', async (req, res, next) => {
+    try {
+        const uid = req.session.userId;
+        const filters = {
+            from: req.query.from || '',
+            to: req.query.to || '',
+            accountId: /^\d+$/.test(req.query.account || '') ? req.query.account : ''
+        };
+
+        res.render('funds_added', {
+            pageTitle: 'Funds added',
+            accounts: await service.getAccounts(uid),
+            history: await service.getFundsAdded(uid, filters),
+            filters,
+            money,
+            formatDate
         });
     } catch (e) {
         next(e);
@@ -21,14 +45,14 @@ router.get('/add-balance', async (req, res, next) => {
 
 router.post('/add-balance', checkCsrf, async (req, res) => {
     try {
-        await service.updateAccountBalance(
+        const result = await service.updateAccountBalance(
             req.session.userId,
             req.body.account_id,
             parseFloat(req.body.amount),
             (req.body.note || '').trim() || null
         );
 
-        setFlash(req, 'Balance updated successfully.', 'success');
+        setFlash(req, `₹${money(result.applied)} added to ${result.accountName}.`, 'success');
     } catch (e) {
         setFlash(req, e.message);
     }

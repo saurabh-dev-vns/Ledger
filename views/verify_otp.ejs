@@ -1,0 +1,59 @@
+<%- include('partials/header') %>
+
+<div class="auth-wrap">
+
+    <div class="auth-card">
+        <p class="auth-eyebrow">
+            Password reset &rsaquo; Step 2 of 3
+        </p>
+
+        <h1>
+            Check your email
+        </h1>
+
+        <p class="auth-sub">
+            We sent a 6-digit code to <strong><%= email %></strong>. Enter it below. The code expires in 10 minutes.
+        </p>
+
+        <form method="POST" action="/verify-otp" class="form">
+            <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+            <input type="hidden" name="email" value="<%= email %>">
+
+            <label>
+                6-digit code
+                <input
+                    type="text"
+                    name="otp"
+                    inputmode="numeric"
+                    pattern="\d{6}"
+                    maxlength="6"
+                    autocomplete="one-time-code"
+                    placeholder="123456"
+                    autofocus
+                    required
+                >
+            </label>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                Verify code
+            </button>
+        </form>
+
+        <form method="POST" action="/forgot-password" class="auth-resend">
+            <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+            <input type="hidden" name="email" value="<%= email %>">
+
+            <button type="submit" class="link-btn">
+                Didn't get a code? Send another
+            </button>
+        </form>
+
+        <p class="auth-switch">
+            <a href="/login">Back to sign in</a>
+        </p>
+    </div>
+
+</div>
+
+<%- include('partials/footer') %>
+
