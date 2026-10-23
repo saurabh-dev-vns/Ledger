@@ -39,7 +39,7 @@ async function insertAccount(userId, name, type, balance, creditLimit, client = 
 /** Row-locks and returns one account (type/balance/credit_limit), or null. */
 async function getAccountForUpdate(userId, accountId, client) {
     const r = await client.query(
-        `SELECT type,balance,credit_limit
+        `SELECT name,type,balance,credit_limit
          FROM accounts
          WHERE id=$1 AND user_id=$2
          FOR UPDATE`,
@@ -102,12 +102,65 @@ async function creditAccountCapped(userId, accountId, amount, client) {
     return r.rows[0] || null;
 }
 
-async function insertBalanceLog(userId, type, amount, note, client = pool) {
+/** Records one "amount added" entry: which account, how much, when (created_at) and why (note). */
+async function insertBalanceLog(userId, accountId, type, amount, note, kind = 'topup', client = pool) {
     await client.query(
-        `INSERT INTO balance_log(user_id,type,amount,note)
-         VALUES($1,$2,$3,$4)`,
-        [userId, type, amount, note || null]
+        `INSERT INTO balance_log(user_id,account_id,type,amount,note,kind)
+         VALUES($1,$2,$3,$4,$5,$6)`,
+        [userId, accountId, type, amount, note || null, kind]
     );
+}
+
+/**
+ * Funds-added history, newest first. Optional filters: from/to (dates,
+ * inclusive), accountId, and limit.
+ */
+async function listBalanceLog(userId, filters = {}, client = pool) {
+    const params = [userId];
+    let sql = `
+        SELECT bl.id, bl.amount, bl.note, bl.kind, bl.created_at,
+               bl.account_id, COALESCE(a.name, INITCAP(bl.type)) AS account_name,
+               COALESCE(a.type, bl.type) AS account_type
+        FROM balance_log bl
+        LEFT JOIN accounts a ON a.id = bl.account_id
+        WHERE bl.user_id = $1`;
+
+    if (filters.from) {
+        params.push(filters.from);
+        sql += ` AND bl.created_at::date >= $${params.length}`;
+    }
+
+    if (filters.to) {
+        params.push(filters.to);
+        sql += ` AND bl.created_at::date <= $${params.length}`;
+    }
+
+    if (filters.accountId) {
+        params.push(filters.accountId);
+        sql += ` AND bl.account_id = $${params.length}`;
+    }
+
+    sql += ' ORDER BY bl.created_at DESC, bl.id DESC';
+
+    if (filters.limit) {
+        params.push(filters.limit);
+        sql += ` LIMIT $${params.length}`;
+    }
+
+    const r = await client.query(sql, params);
+    return r.rows;
+}
+
+/** Sum and count of everything added since a given date (used for "added this month"). */
+async function sumBalanceLogSince(userId, sinceDate, client = pool) {
+    const r = await client.query(
+        `SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS count
+         FROM balance_log
+         WHERE user_id=$1 AND created_at::date >= $2`,
+        [userId, sinceDate]
+    );
+
+    return { total: Number(r.rows[0].total), count: Number(r.rows[0].count) };
 }
 
 module.exports = {
@@ -119,5 +172,7 @@ module.exports = {
     debitAccount,
     creditAccountPlain,
     creditAccountCapped,
-    insertBalanceLog
+    insertBalanceLog,
+    listBalanceLog,
+    sumBalanceLogSince
 };

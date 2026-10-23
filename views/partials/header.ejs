@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FAF7F0">
 <title><%= pageTitle %> · Ledger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -11,14 +12,15 @@
 
 <body>
 
-<% if (currentUser) { %>
+<% if (currentUser) {
+  const is = (...titles) => titles.includes(pageTitle) ? 'active' : '';
+  const moneyPages = ['Add balance', 'Funds added', 'Transfer money', 'Add expense', 'Import past expenses'];
+%>
 
 <header class="topbar">
   <div class="topbar-inner">
 
-    <a href="/dashboard" class="brand">
-      Ledger<span class="brand-dot">.</span>
-    </a>
+    <a href="/dashboard" class="brand">Ledger<span class="brand-dot">.</span></a>
 
     <button
       class="nav-toggle"
@@ -32,18 +34,43 @@
       <span></span>
     </button>
 
-    <nav class="topnav" id="main-navigation">
-      <a href="/dashboard" class="<%= pageTitle === 'Dashboard' ? 'active' : '' %>">Dashboard</a>
-      <a href="/expenses" class="<%= pageTitle === 'All expenses' ? 'active' : '' %>">Expenses</a>
-      <a href="/add-expense" class="<%= pageTitle === 'Add expense' ? 'active' : '' %>">Add expense</a>
-      <a href="/import-expenses" class="<%= pageTitle === 'Import past expenses' ? 'active' : '' %>">Import history</a>
-      <a href="/accounts" class="<%= pageTitle === 'Accounts' ? 'active' : '' %>">Accounts</a>
-      <a href="/budgets" class="<%= pageTitle === 'Budgets' ? 'active' : '' %>">Budgets</a>
-      <a href="/loans" class="<%= pageTitle === 'Money owed' ? 'active' : '' %>">Money owed</a>
-      <a href="/transactions" class="<%= pageTitle === 'Transactions' ? 'active' : '' %>">Transactions</a>
-      <a href="/reports" class="<%= pageTitle === 'Reports' ? 'active' : '' %>">Reports</a>
+    <nav class="topnav" id="main-navigation" aria-label="Main">
+      <a href="/dashboard" class="<%= is('Dashboard') %>">Dashboard</a>
+      <a href="/expenses" class="<%= is('All expenses') %>">Expenses</a>
+      <a href="/accounts" class="<%= is('Accounts') %>">Accounts</a>
+      <a href="/budgets" class="<%= is('Budgets') %>">Budgets</a>
+      <a href="/loans" class="<%= is('Money owed') %>">Money owed</a>
+      <a href="/transactions" class="<%= is('Transactions') %>">Transactions</a>
+      <a href="/reports" class="<%= is('Reports') %>">Reports</a>
+
+      <div class="nav-menu">
+        <button
+          type="button"
+          class="nav-menu-btn <%= is(...moneyPages) %>"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="money-menu"
+        >
+          Money
+          <svg class="nav-chevron" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <div class="nav-menu-list" id="money-menu">
+          <span class="nav-menu-label">Add &amp; move money</span>
+          <a href="/add-balance" class="<%= is('Add balance') %>">Add balance</a>
+          <a href="/add-expense" class="<%= is('Add expense') %>">Add expense</a>
+          <a href="/swap-balance" class="<%= is('Transfer money') %>">Transfer money</a>
+
+          <span class="nav-menu-label">History</span>
+          <a href="/funds-added" class="<%= is('Funds added') %>">Funds added</a>
+          <a href="/import-expenses" class="<%= is('Import past expenses') %>">Import history</a>
+        </div>
+      </div>
+
       <div class="topbar-user">
-        <a href="/profile" class="topbar-username <%= pageTitle === 'Profile' ? 'active' : '' %>"><%= currentUser.name %></a>
+        <a href="/profile" class="topbar-username <%= is('Profile') %>"><%= currentUser.name %></a>
         <form method="POST" action="/logout">
           <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
           <button type="submit" class="logout-link">Sign out</button>
@@ -54,62 +81,70 @@
   </div>
 </header>
 
-<% } %>
-
-<% if (currentUser) { %>
-
 <script>
   (() => {
     const toggle = document.querySelector('.nav-toggle');
     const nav = document.querySelector('#main-navigation');
-
+    const menuBtn = document.querySelector('.nav-menu-btn');
+    const menu = document.querySelector('.nav-menu');
     if (!toggle || !nav) return;
 
-    const closeNavigation = () => {
-      nav.classList.remove('open');
-      toggle.classList.remove('open');
+    // Keep in sync with the breakpoint in style.css (max-width: 1024px).
+    const desktop = window.matchMedia('(min-width: 1025px)');
 
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.setAttribute('aria-label', 'Open navigation');
+    const setNav = (open) => {
+      nav.classList.toggle('open', open);
+      toggle.classList.toggle('open', open);
+      document.body.classList.toggle('nav-open', open);
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
     };
 
-    toggle.addEventListener('click', (event) => {
-      event.stopPropagation();
+    const setMenu = (open) => {
+      if (!menu || !menuBtn) return;
+      menu.classList.toggle('open', open);
+      menuBtn.setAttribute('aria-expanded', String(open));
+    };
 
-      const isOpen = nav.classList.toggle('open');
-
-      toggle.classList.toggle('open', isOpen);
-
-      toggle.setAttribute(
-        'aria-expanded',
-        String(isOpen)
-      );
-
-      toggle.setAttribute(
-        'aria-label',
-        isOpen ? 'Close navigation' : 'Open navigation'
-      );
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setNav(!nav.classList.contains('open'));
     });
 
-    nav.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', closeNavigation);
+    if (menuBtn) {
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setMenu(!menu.classList.contains('open'));
+      });
+    }
+
+    // Tapping any link inside the panel closes it.
+    nav.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => {
+      setNav(false);
+      setMenu(false);
+    }));
+
+    // Tap/click outside closes the mobile panel and the desktop dropdown.
+    document.addEventListener('click', (e) => {
+      if (!nav.contains(e.target) && !toggle.contains(e.target)) setNav(false);
+      if (menu && !menu.contains(e.target)) setMenu(false);
     });
 
-    document.addEventListener('click', (event) => {
-      if (
-        nav.classList.contains('open') &&
-        !nav.contains(event.target) &&
-        !toggle.contains(event.target)
-      ) {
-        closeNavigation();
-      }
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const wasOpen = nav.classList.contains('open');
+      const menuWasOpen = menu && menu.classList.contains('open');
+      setNav(false);
+      setMenu(false);
+      if (menuWasOpen && menuBtn) menuBtn.focus();
+      else if (wasOpen) toggle.focus();
     });
 
-    window.addEventListener('resize', () => {
-      if (window.innerWidth > 720) {
-        closeNavigation();
-      }
-    });
+    // Rotating a tablet / resizing the window past the breakpoint resets state.
+    const reset = () => { if (desktop.matches) setNav(false); setMenu(false); };
+    desktop.addEventListener
+      ? desktop.addEventListener('change', reset)
+      : desktop.addListener(reset);
   })();
 </script>
 
@@ -118,7 +153,7 @@
 <main class="page">
 
 <% if (flash) { %>
-  <div class="flash flash-<%= flash.type %>">
+  <div class="flash flash-<%= flash.type %>" role="status">
     <%= flash.message %>
   </div>
 <% } %>

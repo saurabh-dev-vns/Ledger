@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../db/pool');
+const { formatDateTime } = require('../core/money');
 
 async function findSessionUser(req) {
   if (!req.session.userId) return null;
@@ -60,6 +61,7 @@ function locals(req, res, next) {
     req.session.csrfToken = crypto.randomBytes(32).toString('hex');
   }
   res.locals.csrfToken = req.session.csrfToken;
+  res.locals.formatDateTime = formatDateTime;
 
   next();
 }

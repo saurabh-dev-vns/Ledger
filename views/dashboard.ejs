@@ -30,6 +30,12 @@
             <% }) %>
 
             <div class="ledger-split-item">
+                <span class="dot dot-added"></span>
+                Added this month
+                <strong>+₹<%= money(addedThisMonth.total) %></strong>
+            </div>
+
+            <div class="ledger-split-item">
                 <span class="dot dot-spent"></span>
                 Spent this month
                 <strong>₹<%= money(monthTotal) %></strong>
@@ -45,6 +51,26 @@
 </div>
 
 <div class="grid-2">
+
+    <!-- Recent funds added -->
+    <div class="card">
+        <div class="card-head">
+            <h2>Recently added</h2>
+            <a href="/funds-added" class="link-more">View all →</a>
+        </div>
+
+        <% if (!recentAdded.length) { %>
+            <p class="empty">
+                No money added yet. <a href="/add-balance" class="link-more">Add balance →</a>
+            </p>
+        <% } else { %>
+            <div class="added-list">
+                <% recentAdded.forEach(row => { %>
+                    <%- include('partials/added_row', { row }) %>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
 
     <!-- Recent Expenses -->
     <div class="card">

@@ -1,12 +1,12 @@
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
-const { RedisStore } = require('connect-redis');
+const PgSession = require('connect-pg-simple')(session);
 const pinoHttp = require('pino-http');
 
 const env = require('./config/env');
 const logger = require('./core/logger');
-const redisClient = require('./db/redis');
+const pool = require('./db/pool');
 const { locals, requireLogin } = require('./middleware/session');
 
 const authRoutes = require('./modules/auth/auth.routes');
@@ -59,7 +59,14 @@ function createApp() {
     app.use(express.static(path.join(__dirname, '..', 'public')));
 
     app.use(session({
-        store: new RedisStore({ client: redisClient }),
+        // Sessions live in PostgreSQL (the "session" table, created by
+        // initSchema). Expired rows are pruned automatically.
+        store: new PgSession({
+            pool,
+            tableName: 'session',
+            createTableIfMissing: false,
+            pruneSessionInterval: 60 * 15
+        }),
         secret: env.sessionSecret,
         resave: false,
         saveUninitialized: false,

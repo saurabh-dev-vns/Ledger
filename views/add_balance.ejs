@@ -71,4 +71,21 @@
 
 </div>
 
+<div class="card">
+    <div class="card-head">
+        <h2>Recently added</h2>
+        <a href="/funds-added" class="link-more">View all →</a>
+    </div>
+
+    <% if (!recentAdded.length) { %>
+        <p class="empty">Nothing added yet. Your top-ups will show up here with the date, time and account.</p>
+    <% } else { %>
+        <div class="added-list">
+            <% recentAdded.forEach(row => { %>
+                <%- include('partials/added_row', { row }) %>
+            <% }) %>
+        </div>
+    <% } %>
+</div>
+
 <%- include('partials/footer') %>

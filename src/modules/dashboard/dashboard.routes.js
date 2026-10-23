@@ -29,6 +29,8 @@ router.get('/dashboard', async (req, res, next) => {
         const budgets = await budgetsService.getBudgets(uid, new Date().toISOString().slice(0, 7));
         const trend = await expensesService.getMonthlyTrend(uid, 6);
         const loans = await loansService.getLoans(uid);
+        const recentAdded = await accountsService.getRecentFundsAdded(uid, 5);
+        const addedThisMonth = await accountsService.getAddedThisMonth(uid);
 
         res.render('dashboard', {
             pageTitle: 'Dashboard',
@@ -44,6 +46,8 @@ router.get('/dashboard', async (req, res, next) => {
             budgets,
             trend,
             loans,
+            recentAdded,
+            addedThisMonth,
             money,
             formatDate,
             accountTypeLabel

@@ -104,23 +104,76 @@ async function updateAccountBalance(userId, accountId, amount, note) {
             ? await repo.creditAccountCapped(userId, accountId, amount, client)
             : await repo.creditAccountPlain(userId, accountId, amount, client);
 
-        if (['cash', 'online'].includes(after.type)) {
-            await repo.insertBalanceLog(userId, after.type, amount, note, client);
+        const newBalance = Number(after.balance);
+        const applied = round2(newBalance - startingBalance);
+
+        // Every addition is recorded, whatever the account type, so the
+        // "Funds added" history can show when and where money went in.
+        // A card/EMI repayment logs what was actually applied (it is
+        // capped at the limit); if nothing was owed there is nothing to log.
+        const logAmount = capped ? applied : amount;
+
+        if (logAmount > 0) {
+            await repo.insertBalanceLog(
+                userId,
+                accountId,
+                after.type,
+                logAmount,
+                note,
+                capped ? 'repayment' : 'topup',
+                client
+            );
         }
 
-        const newBalance = Number(after.balance);
-
         return {
+            accountName: before.name,
             type: after.type,
             balance: newBalance,
             creditLimit: after.credit_limit === null ? null : Number(after.credit_limit),
-            applied: round2(newBalance - startingBalance),
+            applied,
             requested: amount
         };
     });
 }
 
+/** Funds-added history plus totals (overall and per account) for the filtered rows. */
+async function getFundsAdded(userId, filters = {}) {
+    const rows = (await repo.listBalanceLog(userId, filters)).map(r => ({
+        ...r,
+        amount: Number(r.amount)
+    }));
+
+    const total = rows.reduce((s, r) => s + r.amount, 0);
+
+    const byAccount = [];
+    for (const r of rows) {
+        let entry = byAccount.find(x => x.name === r.account_name);
+        if (!entry) {
+            entry = { name: r.account_name, total: 0, count: 0 };
+            byAccount.push(entry);
+        }
+        entry.total += r.amount;
+        entry.count += 1;
+    }
+    byAccount.sort((a, b) => b.total - a.total);
+
+    return { rows, total: round2(total), count: rows.length, byAccount };
+}
+
+async function getRecentFundsAdded(userId, limit = 5) {
+    const rows = await repo.listBalanceLog(userId, { limit });
+    return rows.map(r => ({ ...r, amount: Number(r.amount) }));
+}
+
+async function getAddedThisMonth(userId) {
+    const monthStart = new Date().toISOString().slice(0, 7) + '-01';
+    return repo.sumBalanceLogSince(userId, monthStart);
+}
+
 module.exports = {
+    getFundsAdded,
+    getRecentFundsAdded,
+    getAddedThisMonth,
     getAccounts,
     getWallet,
     ensureWallet,

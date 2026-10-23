@@ -2,7 +2,7 @@
 
 > Track your money. Understand your spending. Stay in control.
 
-Ledger is a personal finance app built with **Node.js, Express, PostgreSQL, and Redis**. It runs entirely in your browser - no app store, no subscription, no data sent to third parties.
+Ledger is a personal finance app built with **Node.js, Express, and PostgreSQL**. It runs entirely in your browser - no app store, no subscription, no data sent to third parties.
 
 ---
 
@@ -17,7 +17,8 @@ Ledger is a personal finance app built with **Node.js, Express, PostgreSQL, and 
 | 🤝 **Loans** | Track who owes you (and who you owe) |
 | 📊 **Dashboard** | Live totals, recent activity, spending trends |
 | 📈 **Reports** | Monthly category breakdown with totals |
-| 📜 **Transactions** | Unified feed of expenses + transfers |
+| 📜 **Transactions** | Unified feed of expenses, transfers + money added |
+| ➕ **Funds added** | History of every top-up/repayment: when it went in, which account, how much |
 | 👤 **Profile** | Edit name/email, change password, delete account |
 | 🔑 **Forgot Password** | 6-digit OTP sent to your email via Resend |
 
@@ -31,12 +32,10 @@ You need these installed and running:
 
 - [Node.js](https://nodejs.org) (v20 or later)
 - [PostgreSQL](https://www.postgresql.org)
-- [Redis](https://redis.io) - or run it via Docker: `docker run -d -p 6379:6379 redis`
 
 ```bash
 node --version   # v20+
 psql --version
-redis-cli ping   # should reply PONG
 ```
 
 ---
@@ -69,9 +68,6 @@ Create a `.env` file in the project root:
 # PostgreSQL
 DATABASE_URL=postgresql://postgres:password@localhost:5432/ledger
 
-# Redis (for sessions)
-REDIS_URL=redis://127.0.0.1:6379
-
 # App
 PORT=3000
 SESSION_SECRET=change-this-to-a-long-random-string
@@ -88,7 +84,6 @@ LOG_LEVEL=info
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | ✅ Always | PostgreSQL connection string |
-| `REDIS_URL` | ✅ Always | Redis connection string |
 | `SESSION_SECRET` | ✅ In production | Long random string to sign session cookies |
 | `NODE_ENV` | ✅ | `development` or `production` |
 | `PORT` | Optional | Defaults to `3000` |
@@ -113,7 +108,6 @@ npm start
 You should see:
 ```
 INFO: PostgreSQL database initialized.
-INFO: Redis client connected
 INFO: Ledger running at http://localhost:3000
 ```
 
@@ -129,7 +123,7 @@ Open **http://localhost:3000** and register your first account.
 | Web framework | Express.js |
 | Templating | EJS |
 | Database | PostgreSQL (`pg`) |
-| Session store | Redis (`connect-redis` + `express-session`) |
+| Session store | PostgreSQL (`connect-pg-simple` + `express-session`) |
 | Password hashing | bcryptjs |
 | Logging | Pino + pino-http |
 | Email | Resend API |
@@ -140,7 +134,7 @@ Open **http://localhost:3000** and register your first account.
 ## 🔐 Security
 
 - **Passwords** are hashed with bcrypt (never stored as plain text)
-- **Sessions** are stored server-side in Redis - can be revoked instantly on logout
+- **Sessions** are stored server-side in PostgreSQL (`session` table) - can be revoked instantly on logout
 - **CSRF protection** on every POST request via a per-session token
 - **Cookies** are `httpOnly`, `sameSite: lax`, and `secure` in production
 - **SQL injection** prevention via parameterized queries throughout
@@ -154,7 +148,7 @@ Open **http://localhost:3000** and register your first account.
 ```
 ledger-expense-tracker/
 │
-├── server.js                    # Entry point: connects DB + Redis, starts server
+├── server.js                    # Entry point: connects DB, starts server
 ├── .env                         # Your local config (not committed)
 │
 ├── src/
@@ -163,7 +157,6 @@ ledger-expense-tracker/
 │   │
 │   ├── db/
 │   │   ├── pool.js              # PostgreSQL connection pool
-│   │   ├── redis.js             # Redis client
 │   │   └── schema.js            # Auto-creates tables on startup
 │   │
 │   ├── core/
@@ -279,7 +272,6 @@ Set these environment variables on your host (Render, Railway, Fly.io, etc.):
 ```env
 NODE_ENV=production
 DATABASE_URL=your-postgres-url
-REDIS_URL=your-redis-url
 SESSION_SECRET=a-long-random-string
 RESEND_API_KEY=your-resend-key
 RESEND_FROM_EMAIL=you@yourdomain.com
@@ -296,20 +288,6 @@ The app creates all database tables on startup automatically.
 
 ## 🐛 Troubleshooting
 
-<details>
-<summary><strong>❌ "The client is closed" error on startup</strong></summary>
-
-Redis isn't running or isn't reachable. Start Redis:
-```bash
-# Docker
-docker run -d -p 6379:6379 redis
-
-# Or check if it's running
-redis-cli ping   # should reply: PONG
-```
-
-Then make sure `REDIS_URL` in your `.env` points to the right host/port.
-</details>
 
 <details>
 <summary><strong>❌ DATABASE_URL is not set</strong></summary>
@@ -336,13 +314,13 @@ Test-NetConnection -ComputerName localhost -Port 5432
 <details>
 <summary><strong>❌ Session/login not working in production</strong></summary>
 
-Make sure all three are set:
+Make sure these are set:
 ```env
 NODE_ENV=production
+DATABASE_URL=your-postgres-url
 SESSION_SECRET=your-long-random-secret
-REDIS_URL=your-redis-url
 ```
-Sessions require Redis in production. Without it, every request will fail.
+Sessions are stored in your PostgreSQL database (a `session` table is created automatically on startup), so no extra service is needed.
 </details>
 
 <details>
