@@ -109,6 +109,13 @@ function createApp() {
 
     app.use(locals);
 
+    app.get('/health-checkup', (req, res) => {
+        res.status(200).json({
+            status: 'ok',
+            message: 'Server is running'
+        });
+    });
+
     // JSON API for the Next.js / Flutter clients (see src/api/index.js).
     app.use('/api', apiRouter);
 
