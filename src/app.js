@@ -81,6 +81,13 @@ function createApp() {
 
     app.use(locals);
 
+    app.get('/health-checkup', (req, res) => {
+        res.status(200).json({
+            status: 'ok',
+            message: 'Server is running'
+        });
+    });
+
     app.get('/', (req, res) => {
         res.redirect(req.session.userId ? '/dashboard' : '/login');
     });
