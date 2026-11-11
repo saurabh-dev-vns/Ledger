@@ -1541,3 +1541,22 @@ td .added-when { margin-top: 4px; }
 .account-item-savings .inline-form { flex-basis: 100%; }
 .inline-form select { padding: 7px 8px; font-size: 12px; }
 .move-form { padding-top: 2px; }
+
+
+/* ============================================================
+   "Type naturally" (AI expense entry)
+   ============================================================ */
+
+.ai-card { margin-bottom: 20px; border-color: #C6DBD2; background: linear-gradient(180deg, var(--green-soft), var(--paper-raised) 70%); }
+.ai-row { display: flex; gap: 10px; }
+.ai-row input { flex: 1; min-width: 0; }
+.ai-status { min-height: 1.4em; margin: 10px 0 0; font-size: 13.5px; color: var(--ink-soft); }
+.ai-status.ai-ok { color: var(--green); }
+.ai-status.ai-warn { color: #8A5A00; }
+.ai-status.ai-error { color: var(--rust); }
+.ai-filled { box-shadow: 0 0 0 3px rgba(63,143,107,0.35); transition: box-shadow .3s ease; }
+
+@media (max-width: 480px) {
+  .ai-row { flex-direction: column; }
+  .ai-row .btn { width: 100%; }
+}

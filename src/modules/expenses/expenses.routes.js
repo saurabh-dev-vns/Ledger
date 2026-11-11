@@ -1,4 +1,5 @@
 const express = require('express');
+const aiService = require('../ai/ai.service');
 const { checkCsrf, setFlash } = require('../../middleware/session');
 const { money, formatDate } = require('../../core/money');
 const accountsService = require('../accounts/accounts.service');
@@ -15,6 +16,7 @@ router.get('/add-expense', async (req, res, next) => {
             wallet: await accountsService.getWallet(req.session.userId),
             accounts: await accountsService.getAccounts(req.session.userId),
             categories: CATEGORIES,
+            aiEnabled: aiService.isEnabled(),
             money,
             today: new Date().toISOString().slice(0, 10),
             isCreditType
