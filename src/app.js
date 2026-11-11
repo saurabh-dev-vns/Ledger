@@ -21,6 +21,7 @@ const loansRoutes = require('./modules/loans/loans.routes');
 const reportsRoutes = require('./modules/reports/reports.routes');
 const transactionsRoutes = require('./modules/transactions/transactions.routes');
 const profileRoutes = require('./modules/profile/profile.routes');
+const aiRoutes = require('./modules/ai/ai.routes');
 
 function createApp() {
     const app = express();
@@ -79,6 +80,24 @@ function createApp() {
         }
     }));
 
+    // Redirects wait for the session to be written first. Otherwise the
+    // browser can follow a redirect (e.g. login -> /dashboard, or a flash
+    // message) before the PostgreSQL store has saved it, and land logged
+    // out or without the message.
+    app.use((req, res, next) => {
+        const redirect = res.redirect.bind(res);
+
+        res.redirect = (...args) => {
+            if (req.session && typeof req.session.save === 'function') {
+                return req.session.save(err => (err ? next(err) : redirect(...args)));
+            }
+
+            return redirect(...args);
+        };
+
+        next();
+    });
+
     app.use(locals);
 
     app.get('/health-checkup', (req, res) => {
@@ -109,6 +128,7 @@ function createApp() {
     protectedRouter.use(reportsRoutes);
     protectedRouter.use(transactionsRoutes);
     protectedRouter.use(profileRoutes);
+    protectedRouter.use(aiRoutes);
 
     app.use('/', protectedRouter);
 

@@ -6,6 +6,30 @@
     <p class="sub">Choose the exact account you paid from.</p>
 </div>
 
+<% if (aiEnabled) { %>
+<div class="card ai-card">
+    <h2>✨ Type naturally</h2>
+    <p class="hint">
+        Write it the way you'd say it. Hindi, English or Hinglish all work.
+        We fill the form below; you check it and press Save.
+    </p>
+
+    <div class="ai-row">
+        <input
+            type="text"
+            id="ai-text"
+            maxlength="300"
+            autocomplete="off"
+            placeholder="e.g. kal 250 ka petrol Savings bank se"
+            aria-label="Describe your expense"
+        >
+        <button type="button" class="btn btn-primary" id="ai-go">Fill form</button>
+    </div>
+
+    <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
+</div>
+<% } %>
+
 <div class="grid-2">
 
     <div class="card">
@@ -126,5 +150,105 @@
     </div>
 
 </div>
+
+<% if (aiEnabled) { %>
+<script>
+  (() => {
+    const input = document.getElementById('ai-text');
+    const button = document.getElementById('ai-go');
+    const status = document.getElementById('ai-status');
+    const form = document.querySelector('form[action="/add-expense"]');
+    if (!input || !button || !form) return;
+
+    const csrf = form.querySelector('input[name="csrf_token"]').value;
+    const field = (name) => form.querySelector('[name="' + name + '"]');
+
+    const say = (text, kind) => {
+      status.textContent = text;          // textContent: model output is never parsed as HTML
+      status.className = 'ai-status' + (kind ? ' ai-' + kind : '');
+    };
+
+    const mark = (el) => {
+      if (!el) return;
+      el.classList.add('ai-filled');
+      setTimeout(() => el.classList.remove('ai-filled'), 2500);
+    };
+
+    const localToday = () => {
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    };
+
+    const apply = (s) => {
+      const set = (name, value) => {
+        const el = field(name);
+        if (!el || value === null || value === undefined || value === '') return;
+        el.value = value;
+        el.dispatchEvent(new Event('change', { bubbles: true }));  // keeps the Savings Cash/Bank picker in sync
+        mark(el);
+      };
+
+      set('amount', s.amount);
+      set('notes', s.notes);
+      set('category', s.category);
+      set('spent_on', s.spent_on);
+      set('account_id', s.account_id);
+      set('savings_part', s.savings_part);
+    };
+
+    const labels = { amount: 'the amount', account: 'which account', savings_part: 'Savings Cash or Bank' };
+
+    const run = async () => {
+      const text = input.value.trim();
+      if (!text) { say('Type the expense first, for example: kal 250 ka petrol cash se.', 'warn'); return; }
+
+      button.disabled = true;
+      say('Reading that…');
+
+      try {
+        const res = await fetch('/ai/parse-expense', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ csrf_token: csrf, text, today: localToday() })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.ok) {
+          if (data.detail) console.warn('Type naturally: ' + data.detail);   // dev-only hint from the server
+          say(data.error || 'Could not read that. Please fill the form by hand.', 'error');
+          return;
+        }
+
+        apply(data.suggestion);
+
+        const s = data.suggestion;
+        const parts = [];
+        if (s.amount !== null) parts.push('₹' + s.amount);
+        parts.push(s.category);
+        if (s.account_name) parts.push(s.account_name + (s.savings_part ? ' (' + s.savings_part + ')' : ''));
+        parts.push(s.spent_on);
+
+        let msg = 'Filled: ' + parts.join(' · ') + '.';
+        if (data.missing.length) {
+          msg += ' Please choose ' + data.missing.map((m) => labels[m] || m).join(' and ') + '.';
+          say(msg, 'warn');
+        } else {
+          msg += ' Check it, then press Save expense.';
+          say(msg, 'ok');
+        }
+      } catch (e) {
+        say('Network problem. Please try again.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    };
+
+    button.addEventListener('click', run);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(); } });
+  })();
+</script>
+<% } %>
 
 <%- include('partials/footer') %>

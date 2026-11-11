@@ -1,4 +1,4 @@
-﻿# Ledger
+# Ledger
 
 Simple personal expense tracker built with Node.js, Express, and PostgreSQL.
 

@@ -31,5 +31,13 @@ module.exports = {
   resendApiKey: process.env.RESEND_API_KEY || null,
   resendFromEmail: process.env.RESEND_FROM_EMAIL || 'Ledger <onboarding@resend.dev>',
 
+  // "Type naturally" expense entry (Google Gemini). Optional: with no key
+  // the feature is simply hidden. Get a key at https://aistudio.google.com/apikey
+  geminiApiKey: process.env.GEMINI_API_KEY || null,
+  // Google retires Gemini models regularly (gemini-2.5-flash is gone). If this one
+  // stops working the app falls back to a newer model automatically and logs a warning.
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.5-flash',
+  geminiBaseUrl: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
+
   logLevel: process.env.LOG_LEVEL || 'info'
 };
