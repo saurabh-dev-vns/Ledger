@@ -56,7 +56,7 @@ router.get('/insights', async (req, res, next) => {
 });
 
 /** All numbers and chart data for one period, plus the rule-based text. Read only. */
-router.get('/insights/data', async (req, res) => {
+async function insightsData(req, res) {
     if (!isPeriod(req.query.period)) {
         return res.status(400).json({ ok: false, error: 'Choose day, week, month or year.' });
     }
@@ -70,11 +70,13 @@ router.get('/insights/data', async (req, res) => {
         req.log && req.log.error({ err: e }, 'Insights data failed');
         res.status(500).json({ ok: false, error: 'Could not load insights. Please try again.' });
     }
-});
+}
+
+router.get('/insights/data', insightsData);
 
 /** The written insight (AI when available, rules otherwise). Never changes user data. */
-router.post('/insights/ai', async (req, res) => {
-    const token = req.body.csrf_token;
+async function insightsAiText(req, res) {
+    const token = req.body.csrf_token || req.get('x-csrf-token');
 
     if (!token || token !== req.session.csrfToken) {
         return res.status(403).json({ ok: false, error: 'Your session expired. Reload the page and try again.' });
@@ -95,6 +97,10 @@ router.post('/insights/ai', async (req, res) => {
         req.log && req.log.error({ err: e }, 'Insight text failed');
         res.status(500).json({ ok: false, error: 'Could not write the insight. Please try again.' });
     }
-});
+}
+
+router.post('/insights/ai', insightsAiText);
 
 module.exports = router;
+// Reused by the JSON API (src/api) so both share the same rate limiter.
+module.exports.handlers = { insightsData, insightsAiText };

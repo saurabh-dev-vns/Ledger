@@ -90,4 +90,4 @@ function checkCsrf(req, res, next) {
   next();
 }
 
-module.exports = { requireLogin, redirectIfLoggedIn, locals, setFlash, checkCsrf };
+module.exports = { requireLogin, redirectIfLoggedIn, locals, setFlash, checkCsrf, findSessionUser };

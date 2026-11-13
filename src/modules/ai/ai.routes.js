@@ -30,8 +30,8 @@ function allowed(userId) {
  * Turns "kal 250 ka petrol Savings bank se" into suggested form values.
  * Never saves anything.
  */
-router.post('/ai/parse-expense', async (req, res) => {
-    const token = req.body.csrf_token;
+async function parseExpense(req, res) {
+    const token = req.body.csrf_token || req.get('x-csrf-token');
 
     if (!token || token !== req.session.csrfToken) {
         return res.status(403).json({ ok: false, error: 'Your session expired. Reload the page and try again.' });
@@ -59,6 +59,10 @@ router.post('/ai/parse-expense', async (req, res) => {
         req.log && req.log.error({ err: e }, 'AI parse failed');
         res.status(500).json({ ok: false, error: 'Something went wrong. Please fill the form by hand.' });
     }
-});
+}
+
+router.post('/ai/parse-expense', parseExpense);
 
 module.exports = router;
+// Reused by the JSON API (src/api) so both share the same rate limiter.
+module.exports.handlers = { parseExpense };
