@@ -3,6 +3,7 @@ const express = require('express');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const pinoHttp = require('pino-http');
+const helmet = require('helmet');
 
 const env = require('./config/env');
 const logger = require('./core/logger');
@@ -28,6 +29,12 @@ function createApp() {
     const app = express();
 
     app.set('trust proxy', 1);
+
+    // Standard security headers (nosniff, frameguard, referrer policy, HSTS in
+    // production, etc). CSP is off for now because the existing EJS pages still
+    // use inline scripts/styles and Google Fonts; it gets enabled on the Next.js
+    // side (web/) and here once the EJS views are gone.
+    app.use(helmet({ contentSecurityPolicy: false }));
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, '..', 'views'));
 
