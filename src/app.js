@@ -22,6 +22,7 @@ const reportsRoutes = require('./modules/reports/reports.routes');
 const transactionsRoutes = require('./modules/transactions/transactions.routes');
 const profileRoutes = require('./modules/profile/profile.routes');
 const aiRoutes = require('./modules/ai/ai.routes');
+const insightsRoutes = require('./modules/insights/insights.routes');
 
 function createApp() {
     const app = express();
@@ -52,7 +53,7 @@ function createApp() {
             return 'info';
         },
         autoLogging: {
-            ignore: req => req.url.startsWith('/css/') || req.url.startsWith('/favicon')
+            ignore: req => req.url.startsWith('/css/') || req.url.startsWith('/js/') || req.url.startsWith('/vendor/') || req.url.startsWith('/favicon')
         }
     }));
 
@@ -122,6 +123,7 @@ function createApp() {
     protectedRouter.use(transactionsRoutes);
     protectedRouter.use(profileRoutes);
     protectedRouter.use(aiRoutes);
+    protectedRouter.use(insightsRoutes);
 
     app.use('/', protectedRouter);
 

@@ -159,6 +159,18 @@ async function initSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    -- Saved AI texts for the Insights page. One row per user, period and
+    -- date range; replaced when the numbers behind it change.
+    CREATE TABLE IF NOT EXISTS insight_cache (
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      period TEXT NOT NULL CHECK (period IN ('day','week','month','year')),
+      period_key TEXT NOT NULL,
+      facts_hash TEXT NOT NULL,
+      payload JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, period, period_key)
+    );
+
     -- "Funds added" history: every top-up / repayment, for every account
     -- type, tied to the account it went into.
     ALTER TABLE balance_log ADD COLUMN IF NOT EXISTS account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;

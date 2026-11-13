@@ -1,137 +1,224 @@
 <%- include('partials/header') %>
 
+<%
+    const isRange = form.from !== '' || form.to !== '';
+    const periodText = parsed
+        ? (parsed.period.mode === 'range' ? parsed.period.label : parsed.period.month)
+        : '';
+%>
+
 <div class="page-head">
-    <p class="eyebrow">Insights</p>
-    <h1>Monthly report</h1>
+    <p class="eyebrow">Reports</p>
+    <h1><%= parsed && parsed.period.mode === 'range' ? 'Spending report' : 'Monthly report' %></h1>
     <p class="sub">
-        A focused view of your spending for the selected month.
+        A focused view of your spending for the period and filters you choose.
     </p>
 </div>
 
 <div class="card">
-    <form method="GET" action="/reports" class="filter-form">
-        <label>
+    <form method="GET" action="/reports" class="filter-form report-form" id="report-form">
+
+        <fieldset class="mode-switch">
+            <legend>Period</legend>
+
+            <label class="mode-option">
+                <input type="radio" name="mode" value="month" <%= isRange ? '' : 'checked' %>>
+                <span>Month</span>
+            </label>
+
+            <label class="mode-option">
+                <input type="radio" name="mode" value="range" <%= isRange ? 'checked' : '' %>>
+                <span>Custom range</span>
+            </label>
+        </fieldset>
+
+        <label class="period-month">
             Month
-            <input
-                type="month"
-                name="month"
-                value="<%=month%>"
-            >
+            <input type="month" name="month" value="<%= form.month %>">
+        </label>
+
+        <label class="period-range">
+            From
+            <input type="date" name="from" value="<%= form.from %>">
+        </label>
+
+        <label class="period-range">
+            To
+            <input type="date" name="to" value="<%= form.to %>">
+        </label>
+
+        <label>
+            Category
+            <select name="category">
+                <option value="">All categories</option>
+                <% categoriesList.forEach(c => { %>
+                    <option value="<%= c %>" <%= form.category === c ? 'selected' : '' %>><%= c %></option>
+                <% }) %>
+            </select>
+        </label>
+
+        <label>
+            Account
+            <select name="account">
+                <option value="">All accounts</option>
+                <% accounts.forEach(a => { %>
+                    <option value="<%= a.id %>" <%= String(form.account) === String(a.id) ? 'selected' : '' %>><%= a.name %></option>
+                <% }) %>
+                <option value="none" <%= form.account === 'none' ? 'selected' : '' %>>No account (imported)</option>
+            </select>
+        </label>
+
+        <label class="amount-field">
+            Min amount (₹)
+            <input type="number" name="min" min="0" step="0.01" inputmode="decimal" placeholder="0" value="<%= form.min %>">
+        </label>
+
+        <label class="amount-field">
+            Max amount (₹)
+            <input type="number" name="max" min="0" step="0.01" inputmode="decimal" placeholder="Any" value="<%= form.max %>">
+        </label>
+
+        <label class="search-field">
+            Search notes
+            <input type="search" name="q" maxlength="100" placeholder="e.g. petrol" value="<%= form.q %>">
         </label>
 
         <button class="btn btn-primary">
             Generate report
         </button>
 
-        <%# Submits the same month field to the export route, so the file matches what's selected. %>
+        <%# Submits the same fields to the export route, so the file matches what is on screen. %>
         <button class="btn btn-secondary" type="submit" formaction="/reports/export">
             ⬇ Download Excel
         </button>
+
+        <a href="/reports" class="btn btn-secondary">Reset</a>
     </form>
 </div>
 
-<div class="grid-2">
+<% if (error) { %>
 
-    <div class="card">
-        <span class="ledger-total-label">
-            Total spent
-        </span>
-
-        <div class="ledger-total-figure">
-            ₹<%=money(total)%>
-        </div>
-
-        <p class="hint">
-            <%=expenses.length%> expense entries in <%=month%>.
-        </p>
+    <div class="report-error" role="alert">
+        <strong>Could not build the report.</strong>
+        <span><%= error %></span>
     </div>
 
-    <div class="card">
-        <h2>Category breakdown</h2>
+<% } else { %>
 
-        <%if(!categories.length){%>
-            <p class="empty">
-                No spending recorded.
-            </p>
-        <%}else{const max=Math.max(...categories.map(x=>x.total));%>
+    <% if (activeFilters.length) { %>
+        <div class="filter-chips" aria-label="Active filters">
+            <% activeFilters.forEach(label => { %>
+                <span class="chip"><%= label %></span>
+            <% }) %>
+            <a href="/reports?<%= parsed.period.mode === 'range'
+                ? 'from=' + encodeURIComponent(parsed.period.from) + '&to=' + encodeURIComponent(parsed.period.to)
+                : 'month=' + encodeURIComponent(parsed.period.month) %>" class="link-more">Clear filters</a>
+        </div>
+    <% } %>
 
-            <div class="bar-list">
-                <%categories.forEach(c=>{const pct=Math.round(c.total/max*100);%>
+    <div class="grid-2">
 
-                    <div>
-                        <div class="bar-item-head">
-                            <span>
-                                <%=c.category%>
-                            </span>
+        <div class="card">
+            <span class="ledger-total-label">
+                Total spent
+            </span>
 
-                            <span>
-                                ₹<%=money(c.total)%>
-                            </span>
-                        </div>
-
-                        <div class="bar-track">
-                            <div
-                                class="bar-fill"
-                                style="width:<%=pct%>%"
-                            ></div>
-                        </div>
-                    </div>
-
-                <%})%>
+            <div class="ledger-total-figure">
+                ₹<%= money(report.total) %>
             </div>
 
-        <%}%>
-    </div>
-
-</div>
-
-<div class="card">
-    <h2>Month in detail</h2>
-
-    <%if(!expenses.length){%>
-        <p class="empty">
-            No expenses.
-        </p>
-    <%}else{%>
-
-        <div style="overflow-x:auto">
-            <table class="ledger-table ledger-table-full">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Category</th>
-                        <th>Account</th>
-                        <th class="col-amount">Amount</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    <%expenses.forEach(e=>{%>
-                        <tr>
-                            <td class="col-date">
-                                <%=e.spent_on%>
-                            </td>
-
-                            <td>
-                                <span class="cat-tag">
-                                    <%=e.category%>
-                                </span>
-                            </td>
-
-                            <td>
-                                <%= e.account_name ? withPart(e.account_name, e.savings_part) : e.payment_method %>
-                            </td>
-
-                            <td class="col-amount">
-                                ₹<%=money(e.amount)%>
-                            </td>
-                        </tr>
-                    <%})%>
-                </tbody>
-            </table>
+            <p class="hint">
+                <%= report.count %> expense <%= report.count === 1 ? 'entry' : 'entries' %>
+                <%= activeFilters.length ? 'matching your filters ' : '' %>in <%= periodText %>.
+            </p>
         </div>
 
-    <%}%>
-</div>
+        <div class="card">
+            <h2>Category breakdown</h2>
+
+            <% if (!report.categories.length) { %>
+                <p class="empty">
+                    <%= activeFilters.length ? 'No spending matches these filters.' : 'No spending recorded.' %>
+                </p>
+            <% } else { const max = Math.max(...report.categories.map(x => x.total)); %>
+
+                <div class="bar-list">
+                    <% report.categories.forEach(c => { const pct = Math.round(c.total / max * 100); %>
+
+                        <div>
+                            <div class="bar-item-head">
+                                <span><%= c.category %></span>
+                                <span>₹<%= money(c.total) %></span>
+                            </div>
+
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:<%= pct %>%"></div>
+                            </div>
+                        </div>
+
+                    <% }) %>
+                </div>
+
+            <% } %>
+        </div>
+
+    </div>
+
+    <div class="card">
+        <h2><%= parsed.period.mode === 'range' ? 'Expenses in detail' : 'Month in detail' %></h2>
+
+        <% if (!report.expenses.length) { %>
+            <p class="empty">
+                <%= activeFilters.length ? 'No expenses match these filters.' : 'No expenses.' %>
+            </p>
+        <% } else { %>
+
+            <% if (report.truncated) { %>
+                <p class="hint report-cap">
+                    Showing the latest <%= report.expenses.length %> of <%= report.count %> entries.
+                    The total and the category breakdown include all of them, and the Excel file has every row.
+                </p>
+            <% } %>
+
+            <div style="overflow-x:auto">
+                <table class="ledger-table ledger-table-full">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Account</th>
+                            <th>Notes</th>
+                            <th class="col-amount">Amount</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <% report.expenses.forEach(e => { %>
+                            <tr>
+                                <td class="col-date"><%= e.spent_on %></td>
+
+                                <td>
+                                    <span class="cat-tag"><%= e.category %></span>
+                                </td>
+
+                                <td>
+                                    <%= e.account_name ? withPart(e.account_name, e.savings_part) : e.payment_method %>
+                                </td>
+
+                                <td class="col-notes"><%= e.notes || '' %></td>
+
+                                <td class="col-amount">₹<%= money(e.amount) %></td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+
+        <% } %>
+    </div>
+
+<% } %>
+
+<script src="/js/reports.js"></script>
 
 <%- include('partials/footer') %>

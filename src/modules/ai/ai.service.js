@@ -74,6 +74,14 @@ const SCHEMA_HINT =
     'amount (number or null), category (string), notes (string), date (YYYY-MM-DD), ' +
     'account_id (integer or null), savings_part ("cash", "bank" or null).';
 
+/**
+ * What a request needs besides the prompt: the JSON schema the answer
+ * must follow, the same rule written in words (for models that reject a
+ * schema), and the answer size. "Type naturally" uses EXPENSE_SPEC; other
+ * features (like Insights) pass their own to generateJson().
+ */
+const EXPENSE_SPEC = { schema: RESPONSE_SCHEMA, schemaHint: SCHEMA_HINT, maxOutputTokens: 1024 };
+
 function buildSystemInstruction(accounts, today, { withSchemaHint = false } = {}) {
     const accountLines = accounts
         .map(a => `- id ${a.id}: "${a.name}" (type: ${a.type})`)
@@ -114,15 +122,15 @@ function requestVariants(model) {
     return variants;
 }
 
-function buildRequestBody(model, systemInstruction, text, variant) {
+function buildRequestBody(model, systemInstruction, text, variant, spec = EXPENSE_SPEC) {
     const generationConfig = {
-        maxOutputTokens: 1024,
+        maxOutputTokens: spec.maxOutputTokens,
         responseMimeType: 'application/json'
         // No temperature: Gemini 3 is tuned for its default. Determinism
         // comes from the strict rules above plus server-side validation.
     };
 
-    if (variant.schema) generationConfig.responseSchema = RESPONSE_SCHEMA;
+    if (variant.schema) generationConfig.responseSchema = spec.schema;
     if (variant.thinking) generationConfig.thinkingConfig = { thinkingLevel: 'minimal' };
 
     return {
@@ -186,15 +194,16 @@ function extractText(data) {
 }
 
 /** Calls one model, stepping down request options on 400 and retrying once on 500/503. */
-async function callModel(model, systemInstruction, text, deadline) {
+async function callModel(model, systemInstruction, text, deadline, spec = EXPENSE_SPEC) {
     let lastDetail = '';
 
     for (const variant of requestVariants(model)) {
         const body = buildRequestBody(
             model,
-            variant.schema ? systemInstruction : `${systemInstruction}\n\n${SCHEMA_HINT}`,
+            variant.schema ? systemInstruction : `${systemInstruction}\n\n${spec.schemaHint}`,
             text,
-            variant
+            variant,
+            spec
         );
 
         let result = await post(model, body);
@@ -247,13 +256,13 @@ function classifyError(status, detail) {
     return new AiError('The AI service could not process that. Please fill the form by hand.', 502, detail);
 }
 
-async function generate(systemInstruction, text) {
+async function generate(systemInstruction, text, spec = EXPENSE_SPEC) {
     const deadline = Date.now() + TOTAL_BUDGET_MS;
     let lastGone = null;
 
     for (const model of candidateModels()) {
         try {
-            const raw = await callModel(model, systemInstruction, text, deadline);
+            const raw = await callModel(model, systemInstruction, text, deadline, spec);
 
             if (workingModel !== model) {
                 if (model !== env.geminiModel) {
@@ -399,6 +408,15 @@ async function parseExpenseText(userId, rawText, clientToday) {
 }
 
 /**
+ * Asks the model for one JSON object that follows `spec` and returns it
+ * parsed. The caller must still validate every field: model output is
+ * never trusted as is.
+ */
+async function generateJson(systemInstruction, text, spec) {
+    return parseJson(await generate(systemInstruction, text, spec));
+}
+
+/**
  * For `npm run check:gemini`: tries every candidate model with a tiny
  * request and reports exactly what Google answered.
  */
@@ -429,6 +447,8 @@ async function diagnose() {
 module.exports = {
     isEnabled,
     parseExpenseText,
+    generateJson,
+    resolveToday,
     diagnose,
     AiError,
     MAX_TEXT_LENGTH,

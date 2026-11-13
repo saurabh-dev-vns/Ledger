@@ -50,6 +50,7 @@
         <div class="ledger-actions">
             <a href="/add-balance" class="btn btn-secondary">Add balance</a>
             <a href="/swap-balance" class="btn btn-secondary">Transfer</a>
+            <a href="/insights" class="btn btn-secondary">Insights</a>
             <a href="/add-expense" class="btn btn-primary">Add expense</a>
         </div>
     </div>
@@ -119,12 +120,22 @@
 
     <!-- This Month by Category -->
     <div class="card">
-        <h2>This month by category</h2>
+        <div class="card-head">
+            <h2>This month by category</h2>
+            <a href="/insights?period=month" class="link-more">Insights →</a>
+        </div>
 
         <% if (!byCategory.length) { %>
             <p class="empty">No spending this month.</p>
         <% } else { %>
-            <div class="bar-list">
+            <div class="donut-layout" id="dash-cat-chart" hidden>
+                <div class="chart-box chart-box-donut">
+                    <canvas id="dash-cat-canvas" role="img" aria-label="This month's spending by category"></canvas>
+                </div>
+                <ul class="legend-list" id="dash-cat-legend"></ul>
+            </div>
+
+            <div class="bar-list" id="dash-cat-fallback">
                 <% byCategory.forEach(r => {
                     const pct = maxCategory
                         ? Math.round(r.total / maxCategory * 100)
@@ -150,9 +161,16 @@
 
     <!-- Monthly Spending -->
     <div class="card">
-        <h2>Monthly spending</h2>
+        <div class="card-head">
+            <h2>Monthly spending</h2>
+            <a href="/insights?period=year" class="link-more">Insights →</a>
+        </div>
 
-        <div class="trend-list">
+        <div class="chart-box" id="dash-trend-chart" hidden>
+            <canvas id="dash-trend-canvas" role="img" aria-label="Spending for the last months"></canvas>
+        </div>
+
+        <div class="trend-list" id="dash-trend-fallback">
             <% trend.forEach(r => { %>
                 <div class="trend-row">
                     <span><%= r.month %></span>
@@ -304,5 +322,10 @@
     </div>
 
 </div>
+
+<script type="application/json" id="dash-chart-data"><%- JSON.stringify({ byCategory, trend, monthTotal }).replace(/</g, '\\u003c') %></script>
+<script src="/vendor/chartjs/chart.umd.min.js"></script>
+<script src="/js/chart-theme.js"></script>
+<script src="/js/dashboard-charts.js"></script>
 
 <%- include('partials/footer') %>
