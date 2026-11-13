@@ -9,6 +9,7 @@ const env = require('./config/env');
 const logger = require('./core/logger');
 const pool = require('./db/pool');
 const { locals, requireLogin } = require('./middleware/session');
+const apiRouter = require('./api');
 
 const authRoutes = require('./modules/auth/auth.routes');
 const passwordResetRoutes = require('./modules/password-reset/password-reset.routes');
@@ -107,6 +108,9 @@ function createApp() {
     });
 
     app.use(locals);
+
+    // JSON API for the Next.js / Flutter clients (see src/api/index.js).
+    app.use('/api', apiRouter);
 
     app.get('/', (req, res) => {
         res.redirect(req.session.userId ? '/dashboard' : '/login');
