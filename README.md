@@ -61,6 +61,21 @@ Open http://localhost:3000
 
 The app creates its tables automatically on first run.
 
+## Next.js frontend (migration in progress)
+
+The new frontend lives in `web/` (Next.js, TypeScript, Tailwind). It proxies `/api/*` to Express and sends any page it does not serve yet to Express, so the old EJS pages keep working.
+
+```bash
+npm run dev          # Express on :3000
+cd web && npm install
+cp .env.example .env.local
+npm run dev:web      # from the root, or `npm run dev` inside web/ (Next on :3001)
+```
+
+Open http://localhost:3001 (check http://localhost:3001/status).
+
+The JSON API the new frontend uses is documented in [docs/API.md](docs/API.md).
+
 ## Useful scripts
 
 ```bash

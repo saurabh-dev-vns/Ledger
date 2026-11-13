@@ -26,11 +26,17 @@ function toExcelDate(value) {
 }
 
 /**
- * Builds the monthly report workbook: Summary, Categories and Expenses
- * sheets. Amounts are numeric cells (not text) so they can be summed,
- * charted and filtered in Excel.
+ * Builds the report workbook: Summary, Categories and Expenses sheets.
+ * Amounts are numeric cells (not text) so they can be summed, charted and
+ * filtered in Excel.
+ *
+ * `month` alone gives the classic monthly report. For a custom date range
+ * pass `period` ({ mode: 'range', label }); `filters` is the list of
+ * readable filter labels that were applied (shown on the Summary sheet).
  */
-async function buildReportWorkbook({ month, total, categories, expenses }) {
+async function buildReportWorkbook({ month, period = null, filters = [], total, categories, expenses }) {
+    const isRange = !!(period && period.mode === 'range');
+
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Ledger';
     wb.created = new Date();
@@ -39,9 +45,9 @@ async function buildReportWorkbook({ month, total, categories, expenses }) {
     const summary = wb.addWorksheet('Summary');
     summary.columns = [{ width: 24 }, { width: 22 }];
 
-    summary.addRow(['Ledger — Monthly report']).font = { bold: true, size: 14 };
+    summary.addRow([isRange ? 'Ledger - Spending report' : 'Ledger - Monthly report']).font = { bold: true, size: 14 };
     summary.addRow([]);
-    summary.addRow(['Month', month]);
+    summary.addRow(isRange ? ['Period', period.label] : ['Month', month]);
     summary.addRow(['Total spent', Number(total)]).getCell(2).numFmt = RUPEE_FORMAT;
     summary.addRow(['Expense entries', expenses.length]);
     summary.addRow(['Categories', categories.length]);
@@ -52,6 +58,9 @@ async function buildReportWorkbook({ month, total, categories, expenses }) {
     }
 
     summary.addRow(['Generated on', new Date().toISOString().slice(0, 10)]);
+
+    if (filters.length) summary.addRow(['Filters', filters.join('; ')]);
+
     summary.getColumn(1).font = { bold: true };
 
     // ---- Categories ----
@@ -59,7 +68,7 @@ async function buildReportWorkbook({ month, total, categories, expenses }) {
     cats.columns = [
         { header: 'Category', key: 'category', width: 26 },
         { header: 'Total (₹)', key: 'total', width: 16, style: { numFmt: RUPEE_FORMAT } },
-        { header: '% of month', key: 'share', width: 14, style: { numFmt: '0.0%' } }
+        { header: isRange ? '% of period' : '% of month', key: 'share', width: 14, style: { numFmt: '0.0%' } }
     ];
     styleHeader(cats.getRow(1));
 

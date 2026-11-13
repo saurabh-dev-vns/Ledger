@@ -3,11 +3,13 @@ const express = require('express');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const pinoHttp = require('pino-http');
+const helmet = require('helmet');
 
 const env = require('./config/env');
 const logger = require('./core/logger');
 const pool = require('./db/pool');
 const { locals, requireLogin } = require('./middleware/session');
+const apiRouter = require('./api');
 
 const authRoutes = require('./modules/auth/auth.routes');
 const passwordResetRoutes = require('./modules/password-reset/password-reset.routes');
@@ -22,11 +24,18 @@ const reportsRoutes = require('./modules/reports/reports.routes');
 const transactionsRoutes = require('./modules/transactions/transactions.routes');
 const profileRoutes = require('./modules/profile/profile.routes');
 const aiRoutes = require('./modules/ai/ai.routes');
+const insightsRoutes = require('./modules/insights/insights.routes');
 
 function createApp() {
     const app = express();
 
     app.set('trust proxy', 1);
+
+    // Standard security headers (nosniff, frameguard, referrer policy, HSTS in
+    // production, etc). CSP is off for now because the existing EJS pages still
+    // use inline scripts/styles and Google Fonts; it gets enabled on the Next.js
+    // side (web/) and here once the EJS views are gone.
+    app.use(helmet({ contentSecurityPolicy: false }));
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, '..', 'views'));
 
@@ -52,7 +61,7 @@ function createApp() {
             return 'info';
         },
         autoLogging: {
-            ignore: req => req.url.startsWith('/css/') || req.url.startsWith('/favicon')
+            ignore: req => req.url.startsWith('/css/') || req.url.startsWith('/js/') || req.url.startsWith('/vendor/') || req.url.startsWith('/favicon')
         }
     }));
 
@@ -100,13 +109,14 @@ function createApp() {
 
     app.use(locals);
 
+    // JSON API for the Next.js / Flutter clients (see src/api/index.js).
+    app.use('/api', apiRouter);
     app.get('/health-checkup', (req, res) => {
         res.status(200).json({
             status: 'ok',
             message: 'Server is running'
         });
     });
-
     app.get('/', (req, res) => {
         res.redirect(req.session.userId ? '/dashboard' : '/login');
     });
@@ -129,6 +139,7 @@ function createApp() {
     protectedRouter.use(transactionsRoutes);
     protectedRouter.use(profileRoutes);
     protectedRouter.use(aiRoutes);
+    protectedRouter.use(insightsRoutes);
 
     app.use('/', protectedRouter);
 

@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "dev:web": "npm --prefix web run dev",
+    "build:web": "npm --prefix web run build",
     "test": "node --test --test-concurrency=1",
     "test:local": "node --test --test-concurrency=1 --env-file=test.env",
     "check:gemini": "node scripts/check-gemini.js",
@@ -19,6 +21,7 @@
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "express-session": "^1.19.0",
+    "helmet": "^8.3.0",
     "pg": "^8.16.3",
     "pino": "^9.5.0",
     "pino-http": "^10.3.0",

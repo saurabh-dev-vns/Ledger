@@ -1,0 +1,160 @@
+<%- include('partials/header') %>
+
+<div class="page-head">
+    <p class="eyebrow">Insights</p>
+    <h1>How your money moved</h1>
+    <p class="sub">
+        <strong id="period-name"></strong>
+        <span class="range-text" id="period-range"></span>
+    </p>
+</div>
+
+<div id="insights-root"
+     data-csrf="<%= csrfToken %>"
+     data-ai="<%= aiEnabled ? '1' : '0' %>"
+     data-period="<%= period %>"
+     aria-busy="true">
+
+    <div class="period-tabs" role="tablist" aria-label="Time period">
+        <% [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']].forEach(p => { %>
+            <button type="button"
+                    role="tab"
+                    class="period-tab<%= p[0] === period ? ' active' : '' %>"
+                    data-period="<%= p[0] %>"
+                    aria-selected="<%= p[0] === period ? 'true' : 'false' %>"><%= p[1] %></button>
+        <% }) %>
+    </div>
+
+    <div class="insights-error" id="insights-error" role="alert" hidden>
+        <span id="insights-error-text"></span>
+        <button type="button" class="btn btn-secondary" id="insights-retry">Try again</button>
+    </div>
+
+    <!-- Written insight -->
+    <section class="card insight-card" id="insight-card" data-mood="good" aria-live="polite">
+        <div class="insight-top">
+            <span class="insight-badge" id="insight-badge" data-source="rules">Quick summary</span>
+            <span class="insight-pending" id="insight-pending" hidden>Writing a smarter summary...</span>
+        </div>
+
+        <h2 class="insight-headline" id="insight-headline">Loading your insights...</h2>
+        <ul class="insight-points" id="insight-points"></ul>
+
+        <div class="insight-tip" id="insight-tip" hidden>
+            <strong>Tip</strong>
+            <span id="insight-tip-text"></span>
+        </div>
+
+        <p class="hint" id="insight-notice" hidden></p>
+    </section>
+
+    <!-- Key numbers -->
+    <div class="kpi-grid">
+        <div class="kpi kpi-main">
+            <span class="kpi-label">Spent</span>
+            <span class="kpi-value" id="kpi-spent">-</span>
+            <span class="kpi-change" id="kpi-change"></span>
+        </div>
+
+        <div class="kpi">
+            <span class="kpi-label">Average per day</span>
+            <span class="kpi-value" id="kpi-avg">-</span>
+            <span class="kpi-sub" id="kpi-avg-sub"></span>
+        </div>
+
+        <div class="kpi">
+            <span class="kpi-label">Expenses</span>
+            <span class="kpi-value" id="kpi-count">-</span>
+            <span class="kpi-sub" id="kpi-count-sub"></span>
+        </div>
+
+        <div class="kpi">
+            <span class="kpi-label">Biggest expense</span>
+            <span class="kpi-value" id="kpi-biggest">-</span>
+            <span class="kpi-sub" id="kpi-biggest-sub"></span>
+        </div>
+
+        <div class="kpi">
+            <span class="kpi-label">Money added</span>
+            <span class="kpi-value" id="kpi-added">-</span>
+            <span class="kpi-sub" id="kpi-added-sub"></span>
+        </div>
+    </div>
+
+    <div class="insights-grid">
+
+        <!-- Categories -->
+        <div class="card">
+            <h2>Where it went</h2>
+            <p class="empty" id="cat-empty" hidden>No spending in this period.</p>
+
+            <div class="donut-layout">
+                <div class="chart-box chart-box-donut" id="cat-box">
+                    <canvas id="cat-canvas" role="img" aria-label="Spending by category"></canvas>
+                </div>
+                <ul class="legend-list" id="cat-legend"></ul>
+            </div>
+        </div>
+
+        <!-- Trend -->
+        <div class="card">
+            <h2 id="trend-title">Daily spending</h2>
+            <p class="chart-sub" id="trend-sub"></p>
+            <p class="empty" id="trend-empty" hidden>No spending to show yet.</p>
+
+            <div class="chart-box" id="trend-box">
+                <canvas id="trend-canvas" role="img" aria-label="Spending over time"></canvas>
+            </div>
+        </div>
+
+        <!-- Accounts -->
+        <div class="card">
+            <h2>Spent from</h2>
+            <p class="chart-sub">Which account paid for it</p>
+            <p class="empty" id="acct-empty" hidden>No spending in this period.</p>
+
+            <div class="chart-box" id="acct-box">
+                <canvas id="acct-canvas" role="img" aria-label="Spending by account"></canvas>
+            </div>
+        </div>
+
+        <!-- Budgets -->
+        <div class="card">
+            <div class="card-head">
+                <h2>Budgets this month</h2>
+                <a href="/budgets" class="link-more">Manage →</a>
+            </div>
+
+            <p class="empty" id="budget-empty" hidden>
+                No budgets set. <a href="/budgets" class="link-more">Set a budget →</a>
+            </p>
+            <div id="budget-list"></div>
+        </div>
+
+        <!-- Credit and loans -->
+        <div class="card">
+            <div class="card-head">
+                <h2>Credit &amp; loans</h2>
+                <a href="/loans" class="link-more">Money owed →</a>
+            </div>
+
+            <p class="empty" id="credit-empty" hidden>No credit accounts or open loans.</p>
+            <div id="credit-list"></div>
+            <p class="loans-line" id="loans-line" hidden></p>
+        </div>
+    </div>
+
+    <% if (aiEnabled) { %>
+        <p class="hint insights-foot">
+            The written summary is made by AI from the numbers on this page. It only sees totals,
+            category and account names. Check the charts for exact figures.
+        </p>
+    <% } %>
+</div>
+
+<script type="application/json" id="insights-initial"><%- initialJson %></script>
+<script src="/vendor/chartjs/chart.umd.min.js"></script>
+<script src="/js/chart-theme.js"></script>
+<script src="/js/insights.js"></script>
+
+<%- include('partials/footer') %>
