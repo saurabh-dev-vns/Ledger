@@ -74,6 +74,8 @@ npm run dev:web      # from the root, or `npm run dev` inside web/ (Next on :300
 
 Open http://localhost:3001 (check http://localhost:3001/status).
 
+The JSON API the new frontend uses is documented in [docs/API.md](docs/API.md).
+
 ## Useful scripts
 
 ```bash
