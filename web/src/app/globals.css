@@ -1,24 +1,53 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Ledger design tokens (same values as the old public/css/style.css). */
+@theme {
+  --color-paper: #faf7f0;
+  --color-paper-raised: #ffffff;
+  --color-ink: #1f2a24;
+  --color-ink-soft: #5b6660;
+  --color-line: #ded5c0;
+  --color-line-soft: #eae3d2;
+  --color-green: #2f5d50;
+  --color-green-soft: #e4ede9;
+  --color-rust: #b5533c;
+  --color-rust-soft: #f5e5df;
+  --color-gold: #c89b3c;
+
+  --radius-card: 10px;
+  --shadow-card: 0 1px 2px rgba(31, 42, 36, 0.04), 0 6px 20px rgba(31, 42, 36, 0.05);
 }
 
+/* Fonts come from next/font in layout.tsx (self-hosted, no Google request at runtime). */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: var(--font-plex-mono), "Courier New", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    background: var(--color-paper);
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    min-height: 100vh;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-green);
+    outline-offset: 2px;
+  }
 }
