@@ -20,6 +20,7 @@ async function getRecentActivity(userId, limit = 20) {
     const rows = await repo.listRecentForUser(userId, limit);
 
     return rows.map(r => ({
+        id: r.id,
         action: r.action,
         label: actionLabel(r.action),
         details: r.details,

@@ -13,6 +13,7 @@ export const NEXT_ROUTES = new Set<string>([
   "/reset-password",
   "/restore-account",
   "/dashboard",
+  "/profile",
 ]);
 
 export function isNextRoute(href: string): boolean {
