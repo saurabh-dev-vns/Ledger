@@ -36,5 +36,5 @@ export async function proxy(request: NextRequest) {
  * Add a path here each time a page is migrated (matcher values must be literals).
  */
 export const config = {
-  matcher: ["/status/:path*"],
+  matcher: ["/status/:path*", "/dashboard/:path*"],
 };
