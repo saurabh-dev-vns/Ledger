@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api, ApiError, type SessionData } from "@/lib/api";
 import { hardNavigate } from "@/lib/nav";
+import { Greeting } from "@/components/layout/Greeting";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -14,7 +15,7 @@ export function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.SubmitEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -31,9 +32,7 @@ export function LoginForm() {
 
   return (
     <Card>
-      <p className="text-rust text-[12px] font-mono uppercase mb-2 tracking-[.12em]">
-        Welcome back!
-      </p>
+      <Greeting msg="Welcome Back" />
       <h1 className="mb-5 text-2xl">Sign in</h1>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">

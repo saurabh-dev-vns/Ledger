@@ -11,8 +11,6 @@ const pool = require('./db/pool');
 const { locals, requireLogin } = require('./middleware/session');
 const apiRouter = require('./api');
 
-const authRoutes = require('./modules/auth/auth.routes');
-const passwordResetRoutes = require('./modules/password-reset/password-reset.routes');
 const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const accountsRoutes = require('./modules/accounts/accounts.routes');
 const expensesRoutes = require('./modules/expenses/expenses.routes');
@@ -127,10 +125,6 @@ function createApp() {
     app.get('/', (req, res) => {
         res.redirect(req.session.userId ? '/dashboard' : '/login');
     });
-
-    // Public: registration/login/logout/password-reset manage their own redirects.
-    app.use('/', authRoutes);
-    app.use('/', passwordResetRoutes);
 
     // Everything below requires a signed-in user.
     const protectedRouter = express.Router();
