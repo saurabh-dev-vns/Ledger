@@ -11,16 +11,13 @@ const pool = require('./db/pool');
 const { locals, requireLogin } = require('./middleware/session');
 const apiRouter = require('./api');
 
-const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const accountsRoutes = require('./modules/accounts/accounts.routes');
-const expensesRoutes = require('./modules/expenses/expenses.routes');
 const importsRoutes = require('./modules/imports/imports.routes');
 const transfersRoutes = require('./modules/transfers/transfers.routes');
 const budgetsRoutes = require('./modules/budgets/budgets.routes');
 const loansRoutes = require('./modules/loans/loans.routes');
 const reportsRoutes = require('./modules/reports/reports.routes');
 const transactionsRoutes = require('./modules/transactions/transactions.routes');
-const profileRoutes = require('./modules/profile/profile.routes');
 const aiRoutes = require('./modules/ai/ai.routes');
 const insightsRoutes = require('./modules/insights/insights.routes');
 
@@ -129,16 +126,13 @@ function createApp() {
     // Everything below requires a signed-in user.
     const protectedRouter = express.Router();
     protectedRouter.use(requireLogin);
-    protectedRouter.use(dashboardRoutes);
     protectedRouter.use(accountsRoutes);
-    protectedRouter.use(expensesRoutes);
     protectedRouter.use(importsRoutes);
     protectedRouter.use(transfersRoutes);
     protectedRouter.use(budgetsRoutes);
     protectedRouter.use(loansRoutes);
     protectedRouter.use(reportsRoutes);
     protectedRouter.use(transactionsRoutes);
-    protectedRouter.use(profileRoutes);
     protectedRouter.use(aiRoutes);
     protectedRouter.use(insightsRoutes);
 

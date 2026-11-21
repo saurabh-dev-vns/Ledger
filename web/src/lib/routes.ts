@@ -14,6 +14,8 @@ export const NEXT_ROUTES = new Set<string>([
   "/restore-account",
   "/dashboard",
   "/profile",
+  "/expenses",
+  "/add-expense",
 ]);
 
 export function isNextRoute(href: string): boolean {
